@@ -107,7 +107,6 @@ function pauseGame() {
 
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Escape') { pauseGame(); return; }
-  if (e.code === 'KeyF') { toggleWireframe(); return; }
   if (onKeyDown(input, e.code)) e.preventDefault();
 });
 document.addEventListener('keyup', function(e) { onKeyUp(input, e.code); });
@@ -117,21 +116,6 @@ document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 document.addEventListener('pointerlockchange', function() {
   if (!document.pointerLockElement) pauseGame();
 });
-
-// ══════════════════════════════════════════════════════════════
-// 와이어프레임 토글
-// ══════════════════════════════════════════════════════════════
-let wireframeOn = false;
-
-function toggleWireframe() {
-  wireframeOn = !wireframeOn;
-  for (const chunk of loadedChunks.values()) chunk.mat.wireframe = wireframeOn;
-  const btn = document.getElementById('wireframe-btn');
-  btn.classList.toggle('active', wireframeOn);
-  const label = wireframeOn ? '⬡ 와이어프레임 OFF' : '⬡ 와이어프레임 ON';
-  btn.innerHTML = label + ' &nbsp;<span style="opacity:0.55;font-size:11px">[F]</span>';
-}
-document.getElementById('wireframe-btn').addEventListener('click', toggleWireframe);
 
 // ══════════════════════════════════════════════════════════════
 // 세계 관리 (청크 스트리밍)
@@ -157,7 +141,6 @@ function updateWorld(px, pz) {
       if (!ex) {
         const chunk = createChunk(cx, cz, seg);
         chunk.polyCount = Math.floor(chunk.mesh.geometry.index.count / 3);
-        if (wireframeOn) chunk.mat.wireframe = true;
         scene.add(chunk.mesh);
         loadedChunks.set(key, chunk);
       } else if (ex.seg !== seg) {
@@ -165,7 +148,6 @@ function updateWorld(px, pz) {
         disposeChunk(ex);
         const chunk = createChunk(cx, cz, seg);
         chunk.polyCount = Math.floor(chunk.mesh.geometry.index.count / 3);
-        if (wireframeOn) chunk.mat.wireframe = true;
         scene.add(chunk.mesh);
         loadedChunks.set(key, chunk);
       }
