@@ -38,20 +38,23 @@ export function ridgedNoise(x, y) {
   return 1 - Math.abs(n);
 }
 
-// 다이나믹 지형 (산 최대 ~75, 계곡 깊음) — 원본 공식 그대로 ────────
+// 난이도 램프: 코스 진행(출발 z=0에서 멀어질수록) 0→1 ──────────────
+export const RAMP_DISTANCE = 600;  // 이 거리(z)에 걸쳐 난이도가 0→1
+
+export function difficultyAt(wx, wz) {
+  return Math.max(0, Math.min(1, wz / RAMP_DISTANCE));
+}
+
+// 지형 높이 — 출발 구간은 거의 평지, 진행할수록 점점 험준 ────────────
 export function terrainHeight(wx, wz) {
-  const warpX = (smoothNoise(wx * 0.0018 + 1.7,  wz * 0.0018)       - 0.5) * 180;
-  const warpZ = (smoothNoise(wx * 0.0018,          wz * 0.0018 + 4.3) - 0.5) * 180;
-  const wx2 = wx + warpX, wz2 = wz + warpZ;
-  const continent = smoothNoise(wx2 * 0.0028, wz2 * 0.0028);
-  const ridge     = ridgedNoise(wx2 * 0.0055, wz2 * 0.0055);
-  const hill      = smoothNoise(wx2 * 0.018,  wz2 * 0.018);
-  let h = continent * 22
-        + ridge * Math.pow(continent, 0.4) * 65
-        + hill * 14
-        + smoothNoise(wx * 0.055, wz * 0.055) * 4
-        - 20;
-  return h;
+  const diff = difficultyAt(wx, wz);
+  // 항상 깔리는 완만한 기본 굴곡 (±4) — 출발 구간은 사실상 평지
+  const gentle = (smoothNoise(wx * 0.004, wz * 0.004) - 0.5) * 8;
+  // 난이도에 비례해 커지는 험준 성분 (능선 + 언덕)
+  const ridge = ridgedNoise(wx * 0.0055, wz * 0.0055);
+  const hill  = smoothNoise(wx * 0.02,  wz * 0.02);
+  const rugged = (ridge * 30 + hill * 12) * diff;
+  return gentle + rugged;
 }
 
 // 높이를 step(=CHUNK_SIZE/seg) 단위로 반올림 → 계단형 사각 지형 ───

@@ -1,9 +1,9 @@
 // terrain.js 단위 테스트 (M1)
 import { describe, it, expect } from 'vitest';
 import {
-  CHUNK_SIZE, SEG_L0, SEG_L1, SEG_L2, SEG_L3,
+  CHUNK_SIZE, SEG_L0, SEG_L1, SEG_L2, SEG_L3, RAMP_DISTANCE,
   rand2D, lerp, smoothNoise, ridgedNoise,
-  terrainHeight, quantizeHeight, getSeg, heightToColorHex,
+  terrainHeight, quantizeHeight, getSeg, heightToColorHex, difficultyAt,
 } from './terrain.js';
 
 describe('rand2D', () => {
@@ -62,6 +62,35 @@ describe('terrainHeight', () => {
         expect(h).toBeLessThan(90);
       }
     }
+  });
+});
+
+describe('difficultyAt (점진적 난이도)', () => {
+  it('출발(z=0)은 0, 램프 끝은 1, 그 너머는 clamp 1', () => {
+    expect(difficultyAt(0, 0)).toBe(0);
+    expect(difficultyAt(0, RAMP_DISTANCE)).toBe(1);
+    expect(difficultyAt(0, RAMP_DISTANCE * 2)).toBe(1);
+    expect(difficultyAt(0, -100)).toBe(0);
+  });
+  it('진행할수록 단조 증가', () => {
+    expect(difficultyAt(0, 300)).toBeGreaterThan(difficultyAt(0, 100));
+  });
+});
+
+describe('terrainHeight 평탄화/난이도', () => {
+  it('출발 구간은 거의 평지(|h| 작음)', () => {
+    for (let x = -30; x <= 30; x += 15) {
+      expect(Math.abs(terrainHeight(x, 0))).toBeLessThan(6);
+    }
+  });
+  it('먼 구간(고난이도)은 더 험준해질 수 있다', () => {
+    // 같은 지점이라도 난이도 가중으로 후반부 표준편차가 더 크다(샘플 최대치 비교)
+    let nearMax = 0, farMax = 0;
+    for (let x = -100; x <= 100; x += 20) {
+      nearMax = Math.max(nearMax, terrainHeight(x, 20));
+      farMax  = Math.max(farMax,  terrainHeight(x, 580));
+    }
+    expect(farMax).toBeGreaterThan(nearMax);
   });
 });
 

@@ -3,6 +3,10 @@
 ## 목적
 LOD_demo `main.js`에 인라인돼 있던 **절차적 지형 로직**을 Three.js 비의존 순수 모듈로 분리한다. 차량 물리(지면 높이 질의)·도로(지형 위 도로 부설)·렌더(청크 메시 생성)가 모두 이 모듈을 공유한다.
 
+## 난이도 램프 (후속 개선)
+- `RAMP_DISTANCE=600`, `difficultyAt(wx,wz)=clamp(wz/RAMP_DISTANCE,0,1)`.
+- `terrainHeight` = 항상 깔리는 완만한 기복(±4) + 난이도 비례 험준 성분(능선·언덕). 출발(z≈0)은 거의 평지, 진행할수록 험준 → "점점 어려워짐".
+
 ## 공개 API (`src/terrain.js`)
 - 상수: `CHUNK_SIZE=64`, `RENDER_DIST=4`, `SEG_L0=64`, `SEG_L1=32`, `SEG_L2=8`, `SEG_L3=4`
 - `rand2D(x,y)` — 결정론적 의사난수 [0,1)
