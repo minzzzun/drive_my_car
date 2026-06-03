@@ -1,89 +1,24 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import {
+  CHUNK_SIZE, RENDER_DIST, SEG_L0, SEG_L1, SEG_L2, SEG_L3,
+  terrainHeight, quantizeHeight, getSeg, heightToColorHex,
+} from './terrain.js';
 
 // ══════════════════════════════════════════════════════════════
-// 상수
+// 상수 (지형 관련 상수·함수는 terrain.js 에서 import)
 // ══════════════════════════════════════════════════════════════
-const CHUNK_SIZE    = 64;
-const RENDER_DIST   = 4;
-
-// LOD = 세그먼트 수 (많을수록 고해상도 / 계단 단위 = CHUNK_SIZE/seg)
-const SEG_L0 = 64;  // d=0: 1단위 계단 (발 밑 — 매우 세밀)
-const SEG_L1 = 32;  // d=1: 2단위 계단
-const SEG_L2 = 8;   // d=2: 8단위 큰 계단 — 사각형 뚜렷
-const SEG_L3 = 4;   // d≥3: 16단위 — 멀리서 보면 큼직한 블록
-
 const PLAYER_HEIGHT = 1.8;
 const MOVE_SPEED    = 15;
 const JUMP_FORCE    = 10;
 const GRAVITY       = -25;
 
 // ══════════════════════════════════════════════════════════════
-// 노이즈 (Value Noise, 외부 라이브러리 없음)
-// ══════════════════════════════════════════════════════════════
-function rand2D(x, y) {
-  const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return v - Math.floor(v);
-}
-
-function lerp(a, b, t) { return a + (b - a) * t; }
-
-function smoothNoise(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  return lerp(
-    lerp(rand2D(ix,     iy    ), rand2D(ix + 1, iy    ), ux),
-    lerp(rand2D(ix,     iy + 1), rand2D(ix + 1, iy + 1), ux),
-    uy
-  );
-}
-
-function ridgedNoise(x, y) {
-  const n = smoothNoise(x, y) * 2 - 1;
-  return 1 - Math.abs(n);
-}
-
-// 다이나믹 지형 (산 최대 ~75, 계곡 깊음)
-function terrainHeight(wx, wz) {
-  const warpX = (smoothNoise(wx * 0.0018 + 1.7,  wz * 0.0018)       - 0.5) * 180;
-  const warpZ = (smoothNoise(wx * 0.0018,          wz * 0.0018 + 4.3) - 0.5) * 180;
-  const wx2 = wx + warpX, wz2 = wz + warpZ;
-  const continent = smoothNoise(wx2 * 0.0028, wz2 * 0.0028);
-  const ridge     = ridgedNoise(wx2 * 0.0055, wz2 * 0.0055);
-  const hill      = smoothNoise(wx2 * 0.018,  wz2 * 0.018);
-  let h = continent * 22
-        + ridge * Math.pow(continent, 0.4) * 65
-        + hill * 14
-        + smoothNoise(wx * 0.055, wz * 0.055) * 4
-        - 20;
-  return h;
-}
-
-// ══════════════════════════════════════════════════════════════
-// 높이 → 색상 (8단계)
-// ══════════════════════════════════════════════════════════════
-const _col = new THREE.Color();
-
-function heightToRGB(h) {
-  if      (h < -6)  _col.setHex(0x14408a);
-  else if (h <  0)  _col.setHex(0x2e7abf);
-  else if (h <  1)  _col.setHex(0xd4bc7d);
-  else if (h <  9)  _col.setHex(0x2d8a28);
-  else if (h < 20)  _col.setHex(0x3a6b22);
-  else if (h < 35)  _col.setHex(0x7a6b52);
-  else if (h < 50)  _col.setHex(0x8a8080);
-  else               _col.setHex(0xfafafa);
-  return [_col.r, _col.g, _col.b];
-}
-
-// ══════════════════════════════════════════════════════════════
 // 청크 생성 — PlaneGeometry + 계단형 높이 양자화
 // ══════════════════════════════════════════════════════════════
-function createChunk(cx, cz, seg) {
-  const step = CHUNK_SIZE / seg;  // 계단 한 칸 크기 (사각형 단위)
+const _chunkColor = new THREE.Color();   // 색상 변환용 임시 객체
 
+function createChunk(cx, cz, seg) {
   const geo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, seg, seg);
   geo.rotateX(-Math.PI / 2);
 
@@ -95,10 +30,10 @@ function createChunk(cx, cz, seg) {
     const wz  = cz * CHUNK_SIZE + pos[i + 2];
     const raw = terrainHeight(wx, wz);
     // ★ 핵심: 높이를 step 단위로 반올림 → 계단형 사각 지형
-    const h   = Math.round(raw / step) * step;
+    const h   = quantizeHeight(raw, seg);
     pos[i + 1] = h;
-    const [r, g, b] = heightToRGB(h);
-    colors[i] = r; colors[i + 1] = g; colors[i + 2] = b;
+    _chunkColor.setHex(heightToColorHex(h));
+    colors[i] = _chunkColor.r; colors[i + 1] = _chunkColor.g; colors[i + 2] = _chunkColor.b;
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -109,17 +44,6 @@ function createChunk(cx, cz, seg) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
   return { mesh, mat, seg };
-}
-
-// ══════════════════════════════════════════════════════════════
-// LOD 결정
-// ══════════════════════════════════════════════════════════════
-function getSeg(cx, cz, pcx, pcz) {
-  const d = Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz));
-  if (d === 0) return SEG_L0;
-  if (d === 1) return SEG_L1;
-  if (d === 2) return SEG_L2;
-  return           SEG_L3;
 }
 
 // ══════════════════════════════════════════════════════════════
