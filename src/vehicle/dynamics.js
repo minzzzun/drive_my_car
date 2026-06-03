@@ -75,7 +75,8 @@ export function createDynState(spawn = {}) {
 export function stepDynamics(state, inputs, dt, sampleHeight) {
   const { engineAccel, brake, steer } = inputs;
   const speed   = integrateSpeed(state.speed, engineAccel, brake, dt);
-  const heading = state.heading + yawRate(steer, speed) * dt;
+  // 1인칭 화면 기준 조향: 화면 오른쪽 = 월드 -X 이므로 heading 적분 부호를 음수로
+  const heading = state.heading - yawRate(steer, speed) * dt;
   const p       = advance(state, heading, speed, dt);
   const y       = sampleHeight(p.x, p.z) + RIDE_HEIGHT;
 
