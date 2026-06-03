@@ -87,19 +87,36 @@ scene.add(courseGroup);
 const input   = createInput();
 const overlay = document.getElementById('overlay');
 let started   = false;
+let paused    = false;
 
+// 오버레이 클릭 → 시작 또는 (일시정지에서) 재개
 overlay.addEventListener('click', function() {
   started = true;
+  paused = false;
   overlay.style.display = 'none';
   renderer.domElement.requestPointerLock?.();
 });
 
+// 주행 중 일시정지 → 오버레이(설정창) 표시 + 포인터 락 해제
+function pauseGame() {
+  if (!started || paused || score.state !== 'driving') return;
+  paused = true;
+  overlay.style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock?.();
+}
+
 document.addEventListener('keydown', function(e) {
+  if (e.code === 'Escape') { pauseGame(); return; }
   if (e.code === 'KeyF') { toggleWireframe(); return; }
   if (onKeyDown(input, e.code)) e.preventDefault();
 });
 document.addEventListener('keyup', function(e) { onKeyUp(input, e.code); });
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+// ESC로 포인터 락이 풀리면(브라우저 기본 동작) 자동 일시정지
+document.addEventListener('pointerlockchange', function() {
+  if (!document.pointerLockElement) pauseGame();
+});
 
 // ══════════════════════════════════════════════════════════════
 // 와이어프레임 토글
@@ -283,7 +300,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (started && score.state === 'driving') updateVehicle(dt);
+  if (started && !paused && score.state === 'driving') updateVehicle(dt);
 
   const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
   const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
