@@ -11,8 +11,9 @@ import { buildCourse } from './render/road.js';
 import { buildCar, updateCarTransform } from './render/carMesh.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud } from './render/hud.js';
+import { createGearstick } from './render/gearstick.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
-import { createVehicle, stepVehicle } from './vehicle/vehicle.js';
+import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.js';
 import { terrainNormal } from './vehicle/dynamics.js';
 
 // ══════════════════════════════════════════════════════════════
@@ -202,8 +203,11 @@ const SCORING_ENABLED = false;
 // 카메라 시점: 'first'(1인칭) | 'third'(3인칭). 숫자 4로 토글.
 let cameraMode = 'first';
 
+let clutchIn = false;  // 기어봉 UI 표시용 (클러치 충분히 밟힘)
+
 function updateVehicle(dt) {
   const controls = readControls(input);
+  clutchIn = (1 - controls.clutchPedal) <= CLUTCH_SHIFT_MAX;
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
   const d = vehicle.dyn;
 
@@ -249,9 +253,11 @@ function updateVehicle(dt) {
 // ══════════════════════════════════════════════════════════════
 // HUD + 미니맵 + 결과 오버레이
 // ══════════════════════════════════════════════════════════════
-const hud     = createHud();
-const minimap = createMinimap(road, checkpoints);
+const hud       = createHud();
+const minimap   = createMinimap(road, checkpoints);
+const gearstick = createGearstick();
 document.body.appendChild(minimap.canvas);
+document.body.appendChild(gearstick.canvas);
 
 const result = document.createElement('div');
 result.id = 'result';
@@ -264,6 +270,7 @@ document.body.appendChild(result);
 function updateHUD() {
   hud.update(vehicle, score);
   minimap.draw(vehicle.dyn, score);
+  gearstick.draw(vehicle.gear, clutchIn);
 
   if (SCORING_ENABLED && score.state !== 'driving' && result.style.display === 'none') {
     const pass = score.state === 'passed';

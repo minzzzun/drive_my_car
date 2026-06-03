@@ -37,7 +37,7 @@ export function createMinimap(road, checkpoints, opts = {}) {
   canvas.width = size;
   canvas.height = size;
   canvas.style.cssText =
-    `position:fixed;top:14px;right:14px;width:${size}px;height:${size}px;` +
+    `position:fixed;top:14px;right:14px;left:auto;bottom:auto;width:${size}px;height:${size}px;` +
     'border:2px solid rgba(255,255,255,0.6);border-radius:8px;' +
     'background:rgba(20,30,40,0.65);z-index:30';
   const ctx = canvas.getContext('2d');

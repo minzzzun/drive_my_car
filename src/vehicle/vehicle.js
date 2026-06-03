@@ -10,6 +10,7 @@ import { createDynState, stepDynamics } from './dynamics.js';
 
 // 구동력(토크감) 기준. 저단일수록 토크가 커 가속이 빠르다.
 export const ACCEL_BASE = 9;   // 풀스로틀·완전결합 기준 구동 가속(m/s²)
+export const CLUTCH_SHIFT_MAX = 0.2;  // 변속 허용: 클러치 결합도 이 이하(=충분히 밟음)일 때만
 
 export function createVehicle(spawn = {}) {
   return {
@@ -22,12 +23,15 @@ export function createVehicle(spawn = {}) {
 // controls = {throttle, brake, clutchPedal, steer, shift(+1/-1/0), ignition}
 export function stepVehicle(v, controls, dt, sampleHeight) {
   const { throttle, brake, clutchPedal, steer, shift, ignition } = controls;
-  const engagement = 1 - clutchPedal;  // 1=완전 결합(페달 뗌)
+  const engagement = 1 - clutchPedal;  // 1=완전 결합(페달 뗌), 0=완전 분리(클러치 밟음)
 
-  // 변속 (한 스텝 1회 요청) ─────────────────────────────────────
+  // 변속 (한 스텝 1회 요청) — 클러치를 충분히 밟았을 때만 가능 ──────
   let gear = v.gear;
-  if (shift > 0) gear = shiftUp(gear);
-  else if (shift < 0) gear = shiftDown(gear);
+  const clutchIn = engagement <= CLUTCH_SHIFT_MAX;  // 클러치 밟힘
+  if (clutchIn) {
+    if (shift > 0) gear = shiftUp(gear);
+    else if (shift < 0) gear = shiftDown(gear);
+  }
 
   const inGear = gear !== 0;
 
