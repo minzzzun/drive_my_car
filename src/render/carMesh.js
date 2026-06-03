@@ -45,11 +45,24 @@ export function buildCar(opts = {}) {
   return car;
 }
 
-// dyn(위치/heading/roll/pitch) → 그룹 변환 ─────────────────────────
-export function updateCarTransform(group, dyn) {
+// 차량 정렬 — '천장' 축(up=지형 법선) 기준으로 heading 회전 ─────────
+// up(차체 위 방향)이 지형 법선을 향하고, 진행 방향(heading)을 그 면에 투영.
+const _up    = new THREE.Vector3();
+const _fwd   = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _basis = new THREE.Matrix4();
+
+export function updateCarTransform(group, dyn, up) {
   group.position.set(dyn.x, dyn.y, dyn.z);
-  group.rotation.order = 'YXZ';
-  group.rotation.y = dyn.heading;
-  group.rotation.x = -(dyn.pitch ?? 0);
-  group.rotation.z = -(dyn.roll ?? 0);
+
+  _up.set(up?.x ?? 0, up?.y ?? 1, up?.z ?? 0).normalize();
+  // 수평 진행 방향을 지형면에 투영
+  _fwd.set(Math.sin(dyn.heading), 0, Math.cos(dyn.heading));
+  _fwd.addScaledVector(_up, -_fwd.dot(_up)).normalize();
+  // 오른손 좌표계: right = up × forward, forward 재직교
+  _right.crossVectors(_up, _fwd).normalize();
+  _fwd.crossVectors(_right, _up).normalize();
+  // 차 로컬축: +X=right, +Y=up(천장), +Z=forward
+  _basis.makeBasis(_right, _up, _fwd);
+  group.quaternion.setFromRotationMatrix(_basis);
 }

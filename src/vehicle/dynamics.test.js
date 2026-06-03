@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   RIDE_HEIGHT, ROLL_LIMIT,
   integrateSpeed, yawRate, advance, terrainTiltAt, corneringRoll, isRollover,
-  createDynState, stepDynamics,
+  terrainNormal, createDynState, stepDynamics,
 } from './dynamics.js';
 
 const flat = () => 0; // 평지 mock
@@ -68,6 +68,26 @@ describe('corneringRoll', () => {
     const b = corneringRoll(1, 20);
     expect(Math.abs(b)).toBeGreaterThan(Math.abs(a));
     expect(Math.sign(a)).toBe(-1);
+  });
+});
+
+describe('terrainNormal (차체 천장 방향)', () => {
+  it('평지는 (0,1,0)', () => {
+    const n = terrainNormal(0, 0, flat);
+    expect(n.x).toBeCloseTo(0, 6);
+    expect(n.y).toBeCloseTo(1, 6);
+    expect(n.z).toBeCloseTo(0, 6);
+  });
+  it('정규화되어 있다', () => {
+    const up = (x, z) => x * 0.5 + z * 0.3;
+    const n = terrainNormal(10, 4, up);
+    expect(Math.hypot(n.x, n.y, n.z)).toBeCloseTo(1, 6);
+  });
+  it('+X로 오르막이면 법선이 -X로 기운다', () => {
+    const up = (x) => x * 0.5;
+    const n = terrainNormal(0, 0, up);
+    expect(n.x).toBeLessThan(0);
+    expect(n.y).toBeGreaterThan(0);
   });
 });
 

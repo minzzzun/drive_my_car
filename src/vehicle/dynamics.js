@@ -58,6 +58,19 @@ export function corneringRoll(steer, speed) {
   return -steer * Math.abs(speed) * CORNER_ROLL_K;
 }
 
+// 지형 법선 (차체 '천장' 방향) — 중심 차분으로 근사 ────────────────
+export function terrainNormal(x, z, sampleHeight, eps = 1.0) {
+  const hL = sampleHeight(x - eps, z);
+  const hR = sampleHeight(x + eps, z);
+  const hD = sampleHeight(x, z - eps);
+  const hU = sampleHeight(x, z + eps);
+  const nx = (hL - hR) / (2 * eps);
+  const nz = (hD - hU) / (2 * eps);
+  const ny = 1;
+  const len = Math.hypot(nx, ny, nz);
+  return { x: nx / len, y: ny / len, z: nz / len };
+}
+
 // 전복 판정 ───────────────────────────────────────────────────────
 export function isRollover(roll, pitch) {
   return Math.abs(roll) > ROLL_LIMIT || Math.abs(pitch) > PITCH_LIMIT;

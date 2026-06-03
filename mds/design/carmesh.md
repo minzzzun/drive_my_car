@@ -13,6 +13,9 @@
 - 바퀴 4개: CylinderGeometry(0.3,0.3,0.3) 회전(x축 정렬), 네 모서리.
 - 그룹 원점 = 차량 중심(바닥에서 약간 위). `dyn.y = 지형+RIDE_HEIGHT(0.5)` 와 정합.
 
+## 천장축(법선) 정렬 (후속)
+- `updateCarTransform(group, dyn, up)`: 단순 Euler 대신 **up=지형 법선**을 기저로 정렬. 진행(heading)을 면에 투영 → 차가 경사면에 붙어 천장축 기준 회전. 법선은 `dynamics.terrainNormal`. 카메라 `up`도 법선에 맞춤.
+
 ## main.js 결선
 - `buildCar()` 씬에 추가, 매 프레임 `updateCarTransform(car, vehicle.dyn)`.
 - 1인칭 카메라는 운전석(중심 약간 위·앞). 보닛이 시야 하단에 들어오도록.

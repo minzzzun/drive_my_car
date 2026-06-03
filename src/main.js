@@ -13,6 +13,7 @@ import { createMinimap } from './render/minimap.js';
 import { createHud } from './render/hud.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle } from './vehicle/vehicle.js';
+import { terrainNormal } from './vehicle/dynamics.js';
 
 // ══════════════════════════════════════════════════════════════
 // 상수 (지형 상수·함수는 terrain.js 에서 import)
@@ -201,8 +202,6 @@ const SCORING_ENABLED = false;
 // 카메라 시점: 'first'(1인칭) | 'third'(3인칭). 숫자 4로 토글.
 let cameraMode = 'first';
 
-const _fwd = new THREE.Vector3();
-
 function updateVehicle(dt) {
   const controls = readControls(input);
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
@@ -229,24 +228,21 @@ function updateVehicle(dt) {
     prevCollide = collide;
   }
 
-  // 차량 메시 변환
-  updateCarTransform(car, d);
+  // 차체 '천장' 방향(지형 법선) — 차량 정렬·카메라 up·조향축 기준
+  const n = terrainNormal(d.x, d.z, terrainHeight);
+  updateCarTransform(car, d, n);
 
-  // 카메라 (1인칭 / 3인칭)
+  // 카메라 (1인칭 / 3인칭) — up을 차체 천장(법선)에 맞춰 차와 함께 기운다
   const fx = Math.sin(d.heading), fz = Math.cos(d.heading);
+  camera.up.set(n.x, n.y, n.z);
   if (cameraMode === 'third') {
     // 차량 뒤 위쪽에서 바라보는 3인칭
     camera.position.set(d.x - fx * 9, d.y + 4.5, d.z - fz * 9);
     camera.lookAt(d.x + fx * 2, d.y + 1, d.z + fz * 2);
   } else {
     // 1인칭 운전석 (운전석 위치에서 전방 주시)
-    camera.position.set(d.x + fx * 0.2, d.y + EYE_HEIGHT, d.z + fz * 0.2);
-    _fwd.set(fx, -Math.sin(d.pitch) * 0.5, fz);
-    camera.lookAt(
-      camera.position.x + _fwd.x,
-      camera.position.y + _fwd.y,
-      camera.position.z + _fwd.z,
-    );
+    camera.position.set(d.x + fx * 0.4, d.y + EYE_HEIGHT, d.z + fz * 0.4);
+    camera.lookAt(d.x + fx * 5, d.y + EYE_HEIGHT, d.z + fz * 5);
   }
 }
 
