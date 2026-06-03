@@ -1,0 +1,101 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; }
+canvas { display: block; position: absolute; top: 0; left: 0; }
+
+/* ── 시작 오버레이 ─────────────────────────────────────────── */
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; cursor: pointer;
+}
+#overlay-msg {
+  text-align: center;
+  color: #fff;
+  font-family: monospace;
+}
+#overlay-msg h2 { font-size: 30px; margin-bottom: 14px; }
+#overlay-msg  p { font-size: 16px; margin-bottom: 18px; opacity: 0.8; }
+
+.controls-hint {
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 22px; border-radius: 8px;
+  margin-bottom: 14px;
+}
+.controls-hint span {
+  background: rgba(255, 255, 255, 0.22);
+  padding: 2px 8px; border-radius: 4px;
+  font-weight: bold;
+}
+
+.lod-hint {
+  font-size: 12px; opacity: 0.6;
+  line-height: 2; text-align: left;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 16px; border-radius: 6px;
+}
+
+/* ── HUD 패널 ────────────────────────────────────────────── */
+#info-panel {
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #eee; padding: 12px 16px;
+  border-radius: 10px;
+  font-family: monospace; font-size: 12px;
+  min-width: 220px; z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+}
+#info-panel table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+#info-panel td    { padding: 2px 6px; }
+#info-panel td:last-child { text-align: right; color: #7cf; }
+
+.panel-title {
+  font-size: 14px; font-weight: bold; margin-bottom: 4px;
+}
+.panel-hint {
+  margin-top: 8px; color: #777; font-size: 11px;
+  border-top: 1px solid #333; padding-top: 6px; line-height: 1.7;
+}
+
+/* ── 우상단 버튼 ─────────────────────────────────────────── */
+#btn-group {
+  position: fixed; top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 100;
+}
+#btn-group button {
+  background: rgba(0, 0, 0, 0.7); color: #eee;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px; border-radius: 8px;
+  cursor: pointer; font-family: monospace; font-size: 13px;
+}
+#btn-group button:hover { background: rgba(255, 255, 255, 0.12); }
+#btn-group button.active {
+  border-color: #00ff88; color: #00ff88;
+  background: rgba(0, 255, 136, 0.08);
+}
+
+/* ── 비행 모드 배지 ───────────────────────────────────────── */
+#fly-badge {
+  display: none; /* JS가 flyMode 시 block으로 변경 */
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 180, 255, 0.25);
+  border: 1px solid rgba(0, 200, 255, 0.6);
+  color: #aef;
+  padding: 6px 20px; border-radius: 20px;
+  font-family: monospace; font-size: 13px;
+  z-index: 100; pointer-events: none;
+}
+
+/* ── 조준점 ─────────────────────────────────────────────── */
+#crosshair {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 22px; line-height: 1;
+  pointer-events: none; z-index: 100;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}

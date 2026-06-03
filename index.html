@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Open World — Three.js LOD Demo</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+  <!-- 포인터 잠금 오버레이 (클릭하면 게임 시작) -->
+  <div id="overlay">
+    <div id="overlay-msg">
+      <h2>🌍 Open World LOD Demo</h2>
+      <p>클릭하여 시작하세요</p>
+      <div class="controls-hint">
+        <span>W A S D</span> 이동 &nbsp;&nbsp;
+        <span>마우스</span> 시점 &nbsp;&nbsp;
+        <span>Space</span> 점프 &nbsp;&nbsp;
+        <span>F</span> 와이어프레임 &nbsp;&nbsp;
+        <span>ESC</span> 메뉴
+      </div>
+      <div class="lod-hint">
+        🟢 발 아래 청크 &nbsp;&nbsp;— 64분할 · 1단위 계단<br>
+        🟡 1칸 밖 청크 &nbsp;&nbsp;&nbsp;&nbsp;— 32분할 · 2단위<br>
+        🟠 2칸 밖 청크 &nbsp;&nbsp;&nbsp;&nbsp;— 8분할 · 8단위 계단<br>
+        🔴 3칸+ 밖 청크 &nbsp;&nbsp;— 4분할 · 16단위 블록
+      </div>
+    </div>
+  </div>
+
+  <!-- 좌상단 HUD -->
+  <div id="info-panel">
+    <div class="panel-title">🌍 Open World LOD</div>
+    <table>
+      <tr><td>위치 (XYZ)</td><td id="hud-pos">—</td></tr>
+      <tr><td>청크 좌표</td><td id="hud-chunk">—</td></tr>
+      <tr><td>활성 청크</td><td id="hud-chunks">—</td></tr>
+      <tr><td>총 폴리곤</td><td id="hud-poly">—</td></tr>
+      <tr><td>LOD 분포</td><td id="hud-lod" style="letter-spacing:2px">—</td></tr>
+    </table>
+    <div class="panel-hint">
+      LOD · 청크 스트리밍 데모<br>
+      WASD 이동 · Space 점프
+    </div>
+  </div>
+
+  <!-- 우상단 버튼 -->
+  <div id="btn-group">
+    <button id="wireframe-btn">⬡ 와이어프레임 ON &nbsp;<span style="opacity:0.55;font-size:11px">[F]</span></button>
+  </div>
+
+  <!-- 비행 모드 배지 -->
+  <div id="fly-badge">🕊️ 비행 모드 &nbsp;|&nbsp; Space ↑ &nbsp; Shift ↓ &nbsp; 우클릭 해제</div>
+
+  <!-- 조준점 -->
+  <div id="crosshair">+</div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
