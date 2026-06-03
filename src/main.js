@@ -7,6 +7,7 @@ import {
   DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints,
 } from './road.js';
 import { buildCourse } from './render/road.js';
+import { buildCar, updateCarTransform } from './render/carMesh.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle } from './vehicle/vehicle.js';
 
@@ -176,17 +177,29 @@ let vehicle = createVehicle({
   heading: spawnHeading,
 });
 
+// 차량 메시
+const car = buildCar();
+scene.add(car);
+
 const _fwd = new THREE.Vector3();
 
 function updateVehicle(dt) {
   const controls = readControls(input);
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
 
-  // 1인칭 운전석 카메라
+  // 차량 메시 변환
+  updateCarTransform(car, vehicle.dyn);
+
+  // 1인칭 운전석 카메라 (운전석 위치에서 전방 주시)
   const d = vehicle.dyn;
-  camera.position.set(d.x, d.y + EYE_HEIGHT, d.z);
-  _fwd.set(Math.sin(d.heading), -Math.sin(d.pitch) * 0.5, Math.cos(d.heading));
-  camera.lookAt(d.x + _fwd.x, d.y + EYE_HEIGHT + _fwd.y, d.z + _fwd.z);
+  const fx = Math.sin(d.heading), fz = Math.cos(d.heading);
+  camera.position.set(d.x + fx * 0.2, d.y + EYE_HEIGHT, d.z + fz * 0.2);
+  _fwd.set(fx, -Math.sin(d.pitch) * 0.5, fz);
+  camera.lookAt(
+    camera.position.x + _fwd.x,
+    camera.position.y + _fwd.y,
+    camera.position.z + _fwd.z,
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

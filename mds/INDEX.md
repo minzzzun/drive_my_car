@@ -11,6 +11,7 @@
 - [drivetrain.md](design/drivetrain.md) — engine.js + gearbox.js 설계(RPM·클러치·stall·기어비).
 - [dynamics.md](design/dynamics.md) — dynamics.js + vehicle.js 설계(운동학·전복·통합 상태기계).
 - [input.md](design/input.md) — input.js 키 매핑 + 1인칭 운전석 카메라 결선 설계.
+- [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 
 ## 완료 노트 (done)
 - [m0-scaffold.md](done/m0-scaffold.md) — M0 스캐폴드: Vitest 추가, 앱 빌드/테스트 검증.
@@ -19,6 +20,7 @@
 - [m3-drivetrain.md](done/m3-drivetrain.md) — M3 engine.js+gearbox.js, 단위 테스트 23건(stall 시나리오 포함).
 - [m4-dynamics.md](done/m4-dynamics.md) — M4 dynamics.js+vehicle.js, 단위 테스트 21건(전복·통합 출발/stall).
 - [m5-input.md](done/m5-input.md) — M5 input.js(8건) + main.js 1인칭 차량 주행 결선.
+- [m6-carmesh.md](done/m6-carmesh.md) — M6 carMesh.js(2건) + 주행 통합, dev 서버 서빙 확인.
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -30,7 +32,7 @@
 | M3 | engine.js + gearbox.js 구동계 + 테스트 | ✅ 완료 | [done/m3-drivetrain.md](done/m3-drivetrain.md) |
 | M4 | dynamics.js + vehicle.js 동역학 + 테스트 | ✅ 완료 | [done/m4-dynamics.md](done/m4-dynamics.md) |
 | M5 | input.js + 1인칭 운전석 카메라 | ✅ 완료 | [done/m5-input.md](done/m5-input.md) |
-| M6 | carMesh.js + 주행 통합 | 🔜 진행중 | — |
-| M7 | scoring.js 감점/게임오버 + 테스트 | ⬜ | — |
+| M6 | carMesh.js + 주행 통합 | ✅ 완료 | [done/m6-carmesh.md](done/m6-carmesh.md) |
+| M7 | scoring.js 감점/게임오버 + 테스트 | 🔜 진행중 | — |
 | M8 | minimap.js + hud.js | ⬜ | — |
 | M9 | 마감 + 검증 | ⬜ | — |
