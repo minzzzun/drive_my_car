@@ -12,6 +12,10 @@ DOM 이벤트 부착은 main.js가, 매핑 로직은 순수 함수로 분리해 
   - steer: left −1, right +1, 동시/없음 0.
   - shift/ignition: keydown 순간 1회만(엣지).
 
+## 카메라 시점 토글 (후속)
+- 숫자 `4`(Digit4/Numpad4)로 1인칭 ↔ 3인칭 전환. 3인칭은 차량 뒤 위쪽에서 차를 바라봄.
+- 테스트 편의용 `SCORING_ENABLED=false` 플래그로 감점/게임오버 임시 비활성(true로 복구).
+
 ## 1인칭 운전석 카메라 (main.js 결선)
 - PointerLockControls 자유시점 제거. 포인터 락은 커서 숨김 용도로만(수동 관리).
 - 매 프레임 카메라를 차량 운전석에 고정: `pos = (veh.x, veh.y + EYE_HEIGHT, veh.z)`, 전진 `(sin h, cos h)` 바라봄. 약간의 롤 반영 가능(전복 연출).

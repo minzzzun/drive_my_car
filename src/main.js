@@ -107,6 +107,10 @@ function pauseGame() {
 
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Escape') { pauseGame(); return; }
+  if (e.code === 'Digit4' || e.code === 'Numpad4') {
+    cameraMode = cameraMode === 'first' ? 'third' : 'first';
+    return;
+  }
   if (onKeyDown(input, e.code)) e.preventDefault();
 });
 document.addEventListener('keyup', function(e) { onKeyUp(input, e.code); });
@@ -191,6 +195,12 @@ let prevCollide = false;
 const CHECKPOINT_RADIUS = 6;   // 체크포인트 진입 반경
 const COLLISION_TILT    = 0.5; // 경미 충돌로 보는 기울기(전복 미만)
 
+// 테스트용: 점수 제도(감점/게임오버) 임시 비활성. true 로 바꾸면 채점 복구.
+const SCORING_ENABLED = false;
+
+// 카메라 시점: 'first'(1인칭) | 'third'(3인칭). 숫자 4로 토글.
+let cameraMode = 'first';
+
 const _fwd = new THREE.Vector3();
 
 function updateVehicle(dt) {
@@ -198,37 +208,46 @@ function updateVehicle(dt) {
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
   const d = vehicle.dyn;
 
-  // ── 채점 엣지 이벤트 감지 ───────────────────────────────────
-  const onRoad  = isOnRoad(road, d.x, d.z);
-  const tilt    = Math.max(Math.abs(d.roll), Math.abs(d.pitch));
-  const collide = tilt > COLLISION_TILT && !vehicle.rollover && Math.abs(vehicle.speed) > 2;
-  const target  = checkpoints[score.nextCheckpoint];
-  const reached = !!target && Math.hypot(d.x - target.x, d.z - target.z) < CHECKPOINT_RADIUS;
+  // ── 채점 엣지 이벤트 감지 (테스트용으로 임시 비활성 가능) ──────
+  if (SCORING_ENABLED) {
+    const onRoad  = isOnRoad(road, d.x, d.z);
+    const tilt    = Math.max(Math.abs(d.roll), Math.abs(d.pitch));
+    const collide = tilt > COLLISION_TILT && !vehicle.rollover && Math.abs(vehicle.speed) > 2;
+    const target  = checkpoints[score.nextCheckpoint];
+    const reached = !!target && Math.hypot(d.x - target.x, d.z - target.z) < CHECKPOINT_RADIUS;
 
-  score = stepScore(score, {
-    rollover: vehicle.rollover,
-    majorCollision: false,
-    stalled: vehicle.justStalled,
-    offRoad: prevOnRoad && !onRoad,
-    collision: !prevCollide && collide,
-    reachedCheckpoint: reached,
-  }, dt);
+    score = stepScore(score, {
+      rollover: vehicle.rollover,
+      majorCollision: false,
+      stalled: vehicle.justStalled,
+      offRoad: prevOnRoad && !onRoad,
+      collision: !prevCollide && collide,
+      reachedCheckpoint: reached,
+    }, dt);
 
-  prevOnRoad = onRoad;
-  prevCollide = collide;
+    prevOnRoad = onRoad;
+    prevCollide = collide;
+  }
 
   // 차량 메시 변환
   updateCarTransform(car, d);
 
-  // 1인칭 운전석 카메라 (운전석 위치에서 전방 주시)
+  // 카메라 (1인칭 / 3인칭)
   const fx = Math.sin(d.heading), fz = Math.cos(d.heading);
-  camera.position.set(d.x + fx * 0.2, d.y + EYE_HEIGHT, d.z + fz * 0.2);
-  _fwd.set(fx, -Math.sin(d.pitch) * 0.5, fz);
-  camera.lookAt(
-    camera.position.x + _fwd.x,
-    camera.position.y + _fwd.y,
-    camera.position.z + _fwd.z,
-  );
+  if (cameraMode === 'third') {
+    // 차량 뒤 위쪽에서 바라보는 3인칭
+    camera.position.set(d.x - fx * 9, d.y + 4.5, d.z - fz * 9);
+    camera.lookAt(d.x + fx * 2, d.y + 1, d.z + fz * 2);
+  } else {
+    // 1인칭 운전석 (운전석 위치에서 전방 주시)
+    camera.position.set(d.x + fx * 0.2, d.y + EYE_HEIGHT, d.z + fz * 0.2);
+    _fwd.set(fx, -Math.sin(d.pitch) * 0.5, fz);
+    camera.lookAt(
+      camera.position.x + _fwd.x,
+      camera.position.y + _fwd.y,
+      camera.position.z + _fwd.z,
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -250,7 +269,7 @@ function updateHUD() {
   hud.update(vehicle, score);
   minimap.draw(vehicle.dyn, score);
 
-  if (score.state !== 'driving' && result.style.display === 'none') {
+  if (SCORING_ENABLED && score.state !== 'driving' && result.style.display === 'none') {
     const pass = score.state === 'passed';
     result.style.display = 'flex';
     result.innerHTML =

@@ -20,7 +20,7 @@ export function createHud(opts = {}) {
     '<div style="height:8px;background:#333;border-radius:4px;overflow:hidden">' +
     '<div id="hud-rpm" style="height:100%;width:0;background:linear-gradient(90deg,#4caf50,#ffc107,#f44336)"></div></div>' +
     '<div id="hud-line2" style="font-size:13px;margin-top:6px;opacity:.85"></div>' +
-    '<div style="font-size:11px;opacity:.55;margin-top:4px">W 액셀 · S 브레이크 · A/D 조향 · Shift 클러치 · E/Q 기어 · Enter 시동</div>';
+    '<div style="font-size:11px;opacity:.55;margin-top:4px">W 액셀 · S 브레이크 · A/D 조향 · Shift 클러치 · E/Q 기어 · Enter 시동 · 4 시점 · ESC 메뉴</div>';
   document.body.appendChild(el);
 
   const line1 = el.querySelector('#hud-line1');
