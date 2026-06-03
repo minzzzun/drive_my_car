@@ -4,6 +4,10 @@ import {
   CHUNK_SIZE, RENDER_DIST, SEG_L0, SEG_L1, SEG_L2, SEG_L3,
   terrainHeight, quantizeHeight, getSeg, heightToColorHex,
 } from './terrain.js';
+import {
+  DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints,
+} from './road.js';
+import { buildCourse } from './render/road.js';
 
 // ══════════════════════════════════════════════════════════════
 // 상수 (지형 관련 상수·함수는 terrain.js 에서 import)
@@ -267,10 +271,21 @@ window.addEventListener('resize', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
+// 코스(도로 + 체크포인트) 생성
+// ══════════════════════════════════════════════════════════════
+const courseWaypoints = generateCourseWaypoints({ count: 24, start: { x: 0, z: 0 } });
+const road            = createRoad(courseWaypoints);
+const checkpoints     = placeCheckpoints(road, DEFAULT_CHECKPOINTS);
+const { group: courseGroup } = buildCourse(road, checkpoints);
+scene.add(courseGroup);
+
+// ══════════════════════════════════════════════════════════════
 // 초기화 + 루프
 // ══════════════════════════════════════════════════════════════
 updateWorld(0, 0);
-camera.position.set(0, terrainHeight(0, 0) + PLAYER_HEIGHT, 0);
+// 도로 시작점에 스폰
+const _spawn = road.waypoints[0];
+camera.position.set(_spawn.x, terrainHeight(_spawn.x, _spawn.z) + PLAYER_HEIGHT, _spawn.z);
 
 const clock    = new THREE.Clock();
 let lastCX = Infinity, lastCZ = Infinity;
