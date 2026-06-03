@@ -24,7 +24,8 @@
 - [m5-input.md](done/m5-input.md) — M5 input.js(8건) + main.js 1인칭 차량 주행 결선.
 - [m6-carmesh.md](done/m6-carmesh.md) — M6 carMesh.js(2건) + 주행 통합, dev 서버 서빙 확인.
 - [m7-scoring.md](done/m7-scoring.md) — M7 scoring.js(12건) + 감점/게임오버 통합, 결과 오버레이.
-- [m8-minimap-hud.md](done/m8-minimap-hud.md) — M8 minimap.js(4건)+hud.js(4건), index.html 정리.
+- [m8-minimap-hud.md](done/m8-minimap-hud.md) — M8 minimap.js(5건)+hud.js(3건), index.html 정리.
+- [m9-acceptance.md](done/m9-acceptance.md) — M9 마감: README + ACCEPTANCE_CRITERIA 대조 검증(전 항목 충족).
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -39,4 +40,4 @@
 | M6 | carMesh.js + 주행 통합 | ✅ 완료 | [done/m6-carmesh.md](done/m6-carmesh.md) |
 | M7 | scoring.js 감점/게임오버 + 테스트 | ✅ 완료 | [done/m7-scoring.md](done/m7-scoring.md) |
 | M8 | minimap.js + hud.js | ✅ 완료 | [done/m8-minimap-hud.md](done/m8-minimap-hud.md) |
-| M9 | 마감 + 검증 | 🔜 진행중 | — |
+| M9 | 마감 + 검증 | ✅ 완료 | [done/m9-acceptance.md](done/m9-acceptance.md) |
