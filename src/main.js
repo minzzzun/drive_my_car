@@ -4,8 +4,9 @@ import {
   terrainHeight, quantizeHeight, getSeg, heightToColorHex,
 } from './terrain.js';
 import {
-  DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints,
+  DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints, isOnRoad,
 } from './road.js';
+import { createScore, stepScore, CHECKPOINT_TIME } from './scoring.js';
 import { buildCourse } from './render/road.js';
 import { buildCar, updateCarTransform } from './render/carMesh.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
@@ -181,17 +182,44 @@ let vehicle = createVehicle({
 const car = buildCar();
 scene.add(car);
 
+// 채점 상태 + 엣지 감지용 이전값
+let score = createScore({ totalCheckpoints: checkpoints.length, timeLimit: CHECKPOINT_TIME });
+let prevOnRoad = true;
+let prevCollide = false;
+
+const CHECKPOINT_RADIUS = 6;   // 체크포인트 진입 반경
+const COLLISION_TILT    = 0.5; // 경미 충돌로 보는 기울기(전복 미만)
+
 const _fwd = new THREE.Vector3();
 
 function updateVehicle(dt) {
   const controls = readControls(input);
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
+  const d = vehicle.dyn;
+
+  // ── 채점 엣지 이벤트 감지 ───────────────────────────────────
+  const onRoad  = isOnRoad(road, d.x, d.z);
+  const tilt    = Math.max(Math.abs(d.roll), Math.abs(d.pitch));
+  const collide = tilt > COLLISION_TILT && !vehicle.rollover && Math.abs(vehicle.speed) > 2;
+  const target  = checkpoints[score.nextCheckpoint];
+  const reached = !!target && Math.hypot(d.x - target.x, d.z - target.z) < CHECKPOINT_RADIUS;
+
+  score = stepScore(score, {
+    rollover: vehicle.rollover,
+    majorCollision: false,
+    stalled: vehicle.justStalled,
+    offRoad: prevOnRoad && !onRoad,
+    collision: !prevCollide && collide,
+    reachedCheckpoint: reached,
+  }, dt);
+
+  prevOnRoad = onRoad;
+  prevCollide = collide;
 
   // 차량 메시 변환
-  updateCarTransform(car, vehicle.dyn);
+  updateCarTransform(car, d);
 
   // 1인칭 운전석 카메라 (운전석 위치에서 전방 주시)
-  const d = vehicle.dyn;
   const fx = Math.sin(d.heading), fz = Math.cos(d.heading);
   camera.position.set(d.x + fx * 0.2, d.y + EYE_HEIGHT, d.z + fz * 0.2);
   _fwd.set(fx, -Math.sin(d.pitch) * 0.5, fz);
@@ -213,15 +241,36 @@ driveHud.style.cssText =
   'font-family:system-ui,sans-serif;font-size:15px;text-align:center;z-index:20;pointer-events:none';
 document.body.appendChild(driveHud);
 
+// 결과 오버레이
+const result = document.createElement('div');
+result.id = 'result';
+result.style.cssText =
+  'position:fixed;inset:0;display:none;align-items:center;justify-content:center;' +
+  'background:rgba(0,0,0,0.72);color:#fff;font-family:system-ui,sans-serif;' +
+  'font-size:28px;text-align:center;z-index:50';
+document.body.appendChild(result);
+
 function updateHUD() {
   const v = vehicle;
   const kmh = Math.abs(v.speed) * 3.6;
-  const eng = !v.on ? (v.stalled ? '🔴 시동꺼짐' : '⚪ 시동꺼짐') : '🟢 ON';
+  const eng = !v.on ? (v.stalled ? '🔴 시동꺼짐' : '⚪ OFF') : '🟢 ON';
+  const cpTotal = score.totalCheckpoints;
   driveHud.innerHTML =
     `기어 <b>${v.gearName}</b> &nbsp;|&nbsp; ${Math.round(v.rpm)} RPM &nbsp;|&nbsp; ` +
     `${kmh.toFixed(0)} km/h &nbsp;|&nbsp; ${eng}` +
+    `<br>점수 <b>${score.score}</b> &nbsp;|&nbsp; 체크포인트 ${Math.min(score.nextCheckpoint + 1, cpTotal)}/${cpTotal} ` +
+    `&nbsp;|&nbsp; ⏱ ${Math.max(0, score.timeLeft).toFixed(1)}s` +
     (v.rollover ? ' &nbsp;|&nbsp; ⚠️ 전복' : '') +
     `<br><span style="opacity:.6;font-size:11px">W 액셀 · S 브레이크 · A/D 조향 · Shift 클러치 · E/Q 기어 · Enter 시동</span>`;
+
+  if (score.state !== 'driving' && result.style.display === 'none') {
+    const pass = score.state === 'passed';
+    result.style.display = 'flex';
+    result.innerHTML =
+      `<div>${pass ? '🎉 합격!' : '❌ 불합격'}<br>` +
+      `<span style="font-size:20px">최종 점수 ${score.score}점</span><br>` +
+      `<span style="font-size:15px;opacity:.7">새로고침(F5)하여 다시 도전</span></div>`;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -246,7 +295,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (started) updateVehicle(dt);
+  if (started && score.state === 'driving') updateVehicle(dt);
 
   const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
   const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
