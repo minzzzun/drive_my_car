@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>Open World — Three.js LOD Demo</title>
+  <title>🚗 1종 수동 운전 시험 — WebGL</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -10,20 +10,19 @@
   <!-- 포인터 잠금 오버레이 (클릭하면 게임 시작) -->
   <div id="overlay">
     <div id="overlay-msg">
-      <h2>🌍 Open World LOD Demo</h2>
+      <h2>🚗 1종 수동 운전 시험</h2>
       <p>클릭하여 시작하세요</p>
       <div class="controls-hint">
-        <span>W A S D</span> 이동 &nbsp;&nbsp;
-        <span>마우스</span> 시점 &nbsp;&nbsp;
-        <span>Space</span> 점프 &nbsp;&nbsp;
-        <span>F</span> 와이어프레임 &nbsp;&nbsp;
-        <span>ESC</span> 메뉴
+        <span>Enter</span> 시동 &nbsp;&nbsp;
+        <span>W</span> 액셀 &nbsp;&nbsp;
+        <span>S</span> 브레이크 &nbsp;&nbsp;
+        <span>A D</span> 조향 &nbsp;&nbsp;
+        <span>Shift</span> 클러치 &nbsp;&nbsp;
+        <span>E / Q</span> 기어 ↑↓
       </div>
       <div class="lod-hint">
-        🟢 발 아래 청크 &nbsp;&nbsp;— 64분할 · 1단위 계단<br>
-        🟡 1칸 밖 청크 &nbsp;&nbsp;&nbsp;&nbsp;— 32분할 · 2단위<br>
-        🟠 2칸 밖 청크 &nbsp;&nbsp;&nbsp;&nbsp;— 8분할 · 8단위 계단<br>
-        🔴 3칸+ 밖 청크 &nbsp;&nbsp;— 4분할 · 16단위 블록
+        엔진 켜고(Enter) → 클러치(Shift) 밟은 채 1단(E) → 반클러치로 출발<br>
+        체크포인트를 순서대로 통과! 시동꺼짐·도로이탈·전복·시간초과는 감점
       </div>
     </div>
   </div>

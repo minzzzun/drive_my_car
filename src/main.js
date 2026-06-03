@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import {
   CHUNK_SIZE, RENDER_DIST, SEG_L0, SEG_L1, SEG_L2, SEG_L3,
   terrainHeight, quantizeHeight, getSeg, heightToColorHex,
@@ -8,14 +7,13 @@ import {
   DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints,
 } from './road.js';
 import { buildCourse } from './render/road.js';
+import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
+import { createVehicle, stepVehicle } from './vehicle/vehicle.js';
 
 // ══════════════════════════════════════════════════════════════
-// 상수 (지형 관련 상수·함수는 terrain.js 에서 import)
+// 상수 (지형 상수·함수는 terrain.js 에서 import)
 // ══════════════════════════════════════════════════════════════
-const PLAYER_HEIGHT = 1.8;
-const MOVE_SPEED    = 15;
-const JUMP_FORCE    = 10;
-const GRAVITY       = -25;
+const EYE_HEIGHT = 1.2;  // 운전석 눈높이 (차량 원점 위)
 
 // ══════════════════════════════════════════════════════════════
 // 청크 생성 — PlaneGeometry + 계단형 높이 양자화
@@ -42,7 +40,7 @@ function createChunk(cx, cz, seg) {
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.attributes.position.needsUpdate = true;
-  geo.computeVertexNormals();   // PlaneGeometry가 알아서 정상 계산
+  geo.computeVertexNormals();
 
   const mat  = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 8 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -71,62 +69,33 @@ scene.add(sunLight);
 scene.add(new THREE.HemisphereLight(0x87ceeb, 0x3d6b3d, 0.45));
 
 // ══════════════════════════════════════════════════════════════
-// PointerLockControls
+// 코스(도로 + 체크포인트) 생성
 // ══════════════════════════════════════════════════════════════
-const controls = new PointerLockControls(camera, renderer.domElement);
-const overlay  = document.getElementById('overlay');
-
-controls.addEventListener('lock',   function() { overlay.style.display = 'none'; });
-controls.addEventListener('unlock', function() { overlay.style.display = 'flex'; });
-overlay.addEventListener('click',   function() { controls.lock(); });
+const courseWaypoints = generateCourseWaypoints({ count: 24, start: { x: 0, z: 0 } });
+const road            = createRoad(courseWaypoints);
+const checkpoints     = placeCheckpoints(road, DEFAULT_CHECKPOINTS);
+const { group: courseGroup } = buildCourse(road, checkpoints);
+scene.add(courseGroup);
 
 // ══════════════════════════════════════════════════════════════
-// 입력 처리
+// 입력 + 시작 오버레이 (포인터 락은 커서 숨김 용도)
 // ══════════════════════════════════════════════════════════════
-const keys = { w: false, s: false, a: false, d: false, space: false, shift: false };
-let velY = 0, canJump = false;
-let flyMode = false;
+const input   = createInput();
+const overlay = document.getElementById('overlay');
+let started   = false;
 
-function toggleFly() {
-  flyMode = !flyMode;
-  velY = 0;
-  document.getElementById('fly-badge').style.display = flyMode ? 'block' : 'none';
-}
-
-document.addEventListener('mousedown', function(e) {
-  if (e.button === 2 && controls.isLocked) toggleFly();
+overlay.addEventListener('click', function() {
+  started = true;
+  overlay.style.display = 'none';
+  renderer.domElement.requestPointerLock?.();
 });
-document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 document.addEventListener('keydown', function(e) {
-  switch (e.code) {
-    case 'KeyW':     keys.w     = true;  break;
-    case 'KeyS':     keys.s     = true;  break;
-    case 'KeyA':     keys.a     = true;  break;
-    case 'KeyD':     keys.d     = true;  break;
-    case 'ShiftLeft':
-    case 'ShiftRight': keys.shift = true; break;
-    case 'Space':
-      keys.space = true;
-      if (!flyMode && canJump) { velY = JUMP_FORCE; canJump = false; }
-      e.preventDefault();
-      break;
-    case 'KeyF':
-      toggleWireframe();
-      break;
-  }
+  if (e.code === 'KeyF') { toggleWireframe(); return; }
+  if (onKeyDown(input, e.code)) e.preventDefault();
 });
-document.addEventListener('keyup', function(e) {
-  switch (e.code) {
-    case 'KeyW':     keys.w     = false; break;
-    case 'KeyS':     keys.s     = false; break;
-    case 'KeyA':     keys.a     = false; break;
-    case 'KeyD':     keys.d     = false; break;
-    case 'ShiftLeft':
-    case 'ShiftRight': keys.shift = false; break;
-    case 'Space':    keys.space = false; break;
-  }
-});
+document.addEventListener('keyup', function(e) { onKeyUp(input, e.code); });
+document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 // ══════════════════════════════════════════════════════════════
 // 와이어프레임 토글
@@ -135,9 +104,7 @@ let wireframeOn = false;
 
 function toggleWireframe() {
   wireframeOn = !wireframeOn;
-  for (const chunk of loadedChunks.values()) {
-    chunk.mat.wireframe = wireframeOn;
-  }
+  for (const chunk of loadedChunks.values()) chunk.mat.wireframe = wireframeOn;
   const btn = document.getElementById('wireframe-btn');
   btn.classList.toggle('active', wireframeOn);
   const label = wireframeOn ? '⬡ 와이어프레임 OFF' : '⬡ 와이어프레임 ON';
@@ -146,7 +113,7 @@ function toggleWireframe() {
 document.getElementById('wireframe-btn').addEventListener('click', toggleWireframe);
 
 // ══════════════════════════════════════════════════════════════
-// 세계 관리
+// 세계 관리 (청크 스트리밍)
 // ══════════════════════════════════════════════════════════════
 const loadedChunks = new Map();
 
@@ -197,68 +164,51 @@ function updateWorld(px, pz) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 플레이어
+// 차량 (1인칭 주행)
 // ══════════════════════════════════════════════════════════════
-const _fwd   = new THREE.Vector3();
-const _right = new THREE.Vector3();
-const _up    = new THREE.Vector3(0, 1, 0);
+const _spawn = road.waypoints[0];
+const _next  = road.waypoints[1] ?? { x: _spawn.x, z: _spawn.z + 1 };
+const spawnHeading = Math.atan2(_next.x - _spawn.x, _next.z - _spawn.z);
+let vehicle = createVehicle({
+  x: _spawn.x,
+  z: _spawn.z,
+  y: terrainHeight(_spawn.x, _spawn.z),
+  heading: spawnHeading,
+});
 
-function updatePlayer(dt) {
-  if (!controls.isLocked) return;
+const _fwd = new THREE.Vector3();
 
-  const FLY_SPEED = MOVE_SPEED * 1.8;
+function updateVehicle(dt) {
+  const controls = readControls(input);
+  vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
 
-  if (flyMode) {
-    camera.getWorldDirection(_fwd);
-    _right.crossVectors(_fwd, _up);
-    if (keys.w) camera.position.addScaledVector(_fwd,    FLY_SPEED * dt);
-    if (keys.s) camera.position.addScaledVector(_fwd,   -FLY_SPEED * dt);
-    if (keys.a) camera.position.addScaledVector(_right, -FLY_SPEED * dt);
-    if (keys.d) camera.position.addScaledVector(_right,  FLY_SPEED * dt);
-    if (keys.space) camera.position.y += FLY_SPEED * dt;
-    if (keys.shift) camera.position.y -= FLY_SPEED * dt;
-  } else {
-    camera.getWorldDirection(_fwd);
-    _fwd.y = 0; _fwd.normalize();
-    _right.crossVectors(_fwd, _up);
-    if (keys.w) camera.position.addScaledVector(_fwd,    MOVE_SPEED * dt);
-    if (keys.s) camera.position.addScaledVector(_fwd,   -MOVE_SPEED * dt);
-    if (keys.a) camera.position.addScaledVector(_right, -MOVE_SPEED * dt);
-    if (keys.d) camera.position.addScaledVector(_right,  MOVE_SPEED * dt);
-    velY += GRAVITY * dt;
-    camera.position.y += velY * dt;
-    const ground = terrainHeight(camera.position.x, camera.position.z) + PLAYER_HEIGHT;
-    if (camera.position.y < ground) { camera.position.y = ground; velY = 0; canJump = true; }
-  }
+  // 1인칭 운전석 카메라
+  const d = vehicle.dyn;
+  camera.position.set(d.x, d.y + EYE_HEIGHT, d.z);
+  _fwd.set(Math.sin(d.heading), -Math.sin(d.pitch) * 0.5, Math.cos(d.heading));
+  camera.lookAt(d.x + _fwd.x, d.y + EYE_HEIGHT + _fwd.y, d.z + _fwd.z);
 }
 
 // ══════════════════════════════════════════════════════════════
-// HUD
+// 임시 주행 HUD (정식 RPM/기어/속도 게이지는 M8)
 // ══════════════════════════════════════════════════════════════
-const hudPos    = document.getElementById('hud-pos');
-const hudChunk  = document.getElementById('hud-chunk');
-const hudChunks = document.getElementById('hud-chunks');
-const hudPoly   = document.getElementById('hud-poly');
-const hudLod    = document.getElementById('hud-lod');
+const driveHud = document.createElement('div');
+driveHud.id = 'drive-hud';
+driveHud.style.cssText =
+  'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);' +
+  'background:rgba(0,0,0,0.6);color:#fff;padding:10px 18px;border-radius:10px;' +
+  'font-family:system-ui,sans-serif;font-size:15px;text-align:center;z-index:20;pointer-events:none';
+document.body.appendChild(driveHud);
 
 function updateHUD() {
-  const p = camera.position;
-  hudPos.textContent    = `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}`;
-  const pcx = Math.floor(p.x / CHUNK_SIZE);
-  const pcz = Math.floor(p.z / CHUNK_SIZE);
-  hudChunk.textContent  = `(${pcx}, ${pcz})`;
-  hudChunks.textContent = loadedChunks.size;
-
-  let poly = 0, l0 = 0, l1 = 0, l2 = 0, l3 = 0;
-  for (const chunk of loadedChunks.values()) {
-    poly += chunk.polyCount;
-    if      (chunk.seg === SEG_L0) l0++;
-    else if (chunk.seg === SEG_L1) l1++;
-    else if (chunk.seg === SEG_L2) l2++;
-    else                           l3++;
-  }
-  hudPoly.textContent = poly.toLocaleString();
-  hudLod.textContent  = `🟢${l0}(1단) 🟡${l1}(2단) 🟠${l2}(8단) 🔴${l3}(16단)`;
+  const v = vehicle;
+  const kmh = Math.abs(v.speed) * 3.6;
+  const eng = !v.on ? (v.stalled ? '🔴 시동꺼짐' : '⚪ 시동꺼짐') : '🟢 ON';
+  driveHud.innerHTML =
+    `기어 <b>${v.gearName}</b> &nbsp;|&nbsp; ${Math.round(v.rpm)} RPM &nbsp;|&nbsp; ` +
+    `${kmh.toFixed(0)} km/h &nbsp;|&nbsp; ${eng}` +
+    (v.rollover ? ' &nbsp;|&nbsp; ⚠️ 전복' : '') +
+    `<br><span style="opacity:.6;font-size:11px">W 액셀 · S 브레이크 · A/D 조향 · Shift 클러치 · E/Q 기어 · Enter 시동</span>`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -271,30 +221,19 @@ window.addEventListener('resize', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
-// 코스(도로 + 체크포인트) 생성
-// ══════════════════════════════════════════════════════════════
-const courseWaypoints = generateCourseWaypoints({ count: 24, start: { x: 0, z: 0 } });
-const road            = createRoad(courseWaypoints);
-const checkpoints     = placeCheckpoints(road, DEFAULT_CHECKPOINTS);
-const { group: courseGroup } = buildCourse(road, checkpoints);
-scene.add(courseGroup);
-
-// ══════════════════════════════════════════════════════════════
 // 초기화 + 루프
 // ══════════════════════════════════════════════════════════════
-updateWorld(0, 0);
-// 도로 시작점에 스폰
-const _spawn = road.waypoints[0];
-camera.position.set(_spawn.x, terrainHeight(_spawn.x, _spawn.z) + PLAYER_HEIGHT, _spawn.z);
+updateWorld(_spawn.x, _spawn.z);
+camera.position.set(_spawn.x, terrainHeight(_spawn.x, _spawn.z) + EYE_HEIGHT, _spawn.z);
 
-const clock    = new THREE.Clock();
+const clock = new THREE.Clock();
 let lastCX = Infinity, lastCZ = Infinity;
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  updatePlayer(dt);
+  if (started) updateVehicle(dt);
 
   const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
   const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
