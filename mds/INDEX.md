@@ -13,6 +13,7 @@
 - [input.md](design/input.md) — input.js 키 매핑 + 1인칭 운전석 카메라 결선 설계.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
+- [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
 
 ## 완료 노트 (done)
 - [m0-scaffold.md](done/m0-scaffold.md) — M0 스캐폴드: Vitest 추가, 앱 빌드/테스트 검증.
@@ -23,6 +24,7 @@
 - [m5-input.md](done/m5-input.md) — M5 input.js(8건) + main.js 1인칭 차량 주행 결선.
 - [m6-carmesh.md](done/m6-carmesh.md) — M6 carMesh.js(2건) + 주행 통합, dev 서버 서빙 확인.
 - [m7-scoring.md](done/m7-scoring.md) — M7 scoring.js(12건) + 감점/게임오버 통합, 결과 오버레이.
+- [m8-minimap-hud.md](done/m8-minimap-hud.md) — M8 minimap.js(4건)+hud.js(4건), index.html 정리.
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -36,5 +38,5 @@
 | M5 | input.js + 1인칭 운전석 카메라 | ✅ 완료 | [done/m5-input.md](done/m5-input.md) |
 | M6 | carMesh.js + 주행 통합 | ✅ 완료 | [done/m6-carmesh.md](done/m6-carmesh.md) |
 | M7 | scoring.js 감점/게임오버 + 테스트 | ✅ 완료 | [done/m7-scoring.md](done/m7-scoring.md) |
-| M8 | minimap.js + hud.js | 🔜 진행중 | — |
-| M9 | 마감 + 검증 | ⬜ | — |
+| M8 | minimap.js + hud.js | ✅ 완료 | [done/m8-minimap-hud.md](done/m8-minimap-hud.md) |
+| M9 | 마감 + 검증 | 🔜 진행중 | — |

@@ -9,6 +9,8 @@ import {
 import { createScore, stepScore, CHECKPOINT_TIME } from './scoring.js';
 import { buildCourse } from './render/road.js';
 import { buildCar, updateCarTransform } from './render/carMesh.js';
+import { createMinimap } from './render/minimap.js';
+import { createHud } from './render/hud.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle } from './vehicle/vehicle.js';
 
@@ -231,17 +233,12 @@ function updateVehicle(dt) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 임시 주행 HUD (정식 RPM/기어/속도 게이지는 M8)
+// HUD + 미니맵 + 결과 오버레이
 // ══════════════════════════════════════════════════════════════
-const driveHud = document.createElement('div');
-driveHud.id = 'drive-hud';
-driveHud.style.cssText =
-  'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);' +
-  'background:rgba(0,0,0,0.6);color:#fff;padding:10px 18px;border-radius:10px;' +
-  'font-family:system-ui,sans-serif;font-size:15px;text-align:center;z-index:20;pointer-events:none';
-document.body.appendChild(driveHud);
+const hud     = createHud();
+const minimap = createMinimap(road, checkpoints);
+document.body.appendChild(minimap.canvas);
 
-// 결과 오버레이
 const result = document.createElement('div');
 result.id = 'result';
 result.style.cssText =
@@ -251,17 +248,8 @@ result.style.cssText =
 document.body.appendChild(result);
 
 function updateHUD() {
-  const v = vehicle;
-  const kmh = Math.abs(v.speed) * 3.6;
-  const eng = !v.on ? (v.stalled ? '🔴 시동꺼짐' : '⚪ OFF') : '🟢 ON';
-  const cpTotal = score.totalCheckpoints;
-  driveHud.innerHTML =
-    `기어 <b>${v.gearName}</b> &nbsp;|&nbsp; ${Math.round(v.rpm)} RPM &nbsp;|&nbsp; ` +
-    `${kmh.toFixed(0)} km/h &nbsp;|&nbsp; ${eng}` +
-    `<br>점수 <b>${score.score}</b> &nbsp;|&nbsp; 체크포인트 ${Math.min(score.nextCheckpoint + 1, cpTotal)}/${cpTotal} ` +
-    `&nbsp;|&nbsp; ⏱ ${Math.max(0, score.timeLeft).toFixed(1)}s` +
-    (v.rollover ? ' &nbsp;|&nbsp; ⚠️ 전복' : '') +
-    `<br><span style="opacity:.6;font-size:11px">W 액셀 · S 브레이크 · A/D 조향 · Shift 클러치 · E/Q 기어 · Enter 시동</span>`;
+  hud.update(vehicle, score);
+  minimap.draw(vehicle.dyn, score);
 
   if (score.state !== 'driving' && result.style.display === 'none') {
     const pass = score.state === 'passed';
