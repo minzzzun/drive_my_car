@@ -3,7 +3,7 @@
 // heading 0 → 전진 +Z. 지형 높이는 sampleHeight(x,z) 콜백으로 주입.
 // ══════════════════════════════════════════════════════════════
 
-export const ROLLING_RESIST = 0.6;   // 구름 저항(1/s)
+export const ROLLING_RESIST = 0.08;  // 가벼운 구름/공기 저항(1/s) — 최고속은 기어별 한계가 제어
 export const BRAKE_DECEL    = 12;     // 브레이크 감속(m/s²)
 export const MAX_STEER_RATE = 1.2;    // 최대 요 레이트(rad/s)
 export const TURN_FULL_SPEED = 8;     // 이 속도 이상이면 조향 권한 100%

@@ -2,13 +2,14 @@
 // vehicle.js — engine + gearbox + dynamics 조합 상태기계 (순수 로직)
 // stepVehicle(v, controls, dt, sampleHeight) → 새 차량 상태
 // ══════════════════════════════════════════════════════════════
-import { createEngineState, startEngine, stepEngine } from './engine.js';
+import { createEngineState, startEngine, stepEngine, MAX_RPM } from './engine.js';
 import {
-  shiftUp, shiftDown, totalRatio, engineRpmFromSpeed, gearName,
+  shiftUp, shiftDown, totalRatio, engineRpmFromSpeed, speedFromEngineRpm, gearName,
 } from './gearbox.js';
 import { createDynState, stepDynamics } from './dynamics.js';
 
-export const ACCEL_BASE = 6;   // 1단 풀스로틀·완전결합 기준 구동 가속(m/s²)
+// 구동력(토크감) 기준. 저단일수록 토크가 커 가속이 빠르다.
+export const ACCEL_BASE = 9;   // 풀스로틀·완전결합 기준 구동 가속(m/s²)
 
 export function createVehicle(spawn = {}) {
   return {
@@ -41,10 +42,15 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
   const eng = stepEngine(engineState, { throttle, clutchEngagement: engagement, coupledRpm, inGear }, dt);
 
   // 구동 가속 ───────────────────────────────────────────────────
+  // 기어별 최고속(레드라인×기어비)을 한계로, 그 근처에서 가속이 줄어든다.
+  // 저단=큰 토크·낮은 최고속, 고단=작은 토크·높은 최고속 (실제 차와 동일한 경향).
   let engineAccel = 0;
   if (eng.on && inGear && engagement > 0) {
     const dir = gear < 0 ? -1 : 1;
-    engineAccel = dir * throttle * ACCEL_BASE * (totalRatio(gear) / totalRatio(1)) * engagement;
+    const maxSpeed = Math.abs(speedFromEngineRpm(MAX_RPM, gear)); // 이 기어 최고속
+    const torque   = ACCEL_BASE * (totalRatio(gear) / totalRatio(3)); // 저단일수록 큼
+    const headroom = Math.max(0, 1 - Math.abs(v.dyn.speed) / maxSpeed); // 최고속 근처서 0
+    engineAccel = dir * throttle * torque * engagement * headroom;
   }
 
   // 동역학 스텝 ─────────────────────────────────────────────────

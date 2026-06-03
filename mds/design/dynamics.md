@@ -28,6 +28,9 @@
   - `stepDynamics` 호출.
   - 반환: 새 `{engine, gear, dyn}` + 파생 `{rpm, stalled, justStalled, rollover, gearName}`.
 
+## 구동 모델 (후속 튜닝)
+- 구동 가속 = 기어별 토크(저단↑) × `headroom(1 − |speed|/maxSpeed(gear))`. `maxSpeed`는 레드라인×기어비 → 고단일수록 최고속↑. 구름저항은 가볍게(0.08)만.
+
 ## 테스트 설계
 - dynamics: integrateSpeed(가속/브레이크/무입력 감쇠/정지고정), yawRate(0속도 0·부호·후진반전), advance(heading 0→+Z, π/2→+X), terrainTiltAt(평지 0·경사 부호), corneringRoll(부호·속도증가), isRollover(임계), stepDynamics(평지 전진·y=지형+RIDE_HEIGHT).
 - vehicle: 시동(N에서 ignition→on), 1단 반클러치+throttle→전진 가속, 정지 클러치 덤프→stall(justStalled), 전복 지형→rollover, 변속(shift로 기어 변화).
