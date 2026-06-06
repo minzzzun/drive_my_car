@@ -24,6 +24,7 @@ npm test         # 단위 테스트 (Vitest) 전체 실행
 | `Shift`(홀드) | 클러치 |
 | `E` / `Q` | 기어 ↑ / ↓ (R-N-1-2-3-4-5) |
 | `F` | 와이어프레임 토글 |
+| `M` | 음소거 토글 |
 
 > **후진(R) 기어에서는 W/S가 뒤바뀐다 — `S`=후진 악셀, `W`=브레이크.**
 
@@ -54,6 +55,13 @@ npm test         # 단위 테스트 (Vitest) 전체 실행
 | `src/main.js` | 결선 + 렌더 루프 + 1인칭 카메라 |
 
 설계/명세 문서는 `mds/` 참고 (`mds/INDEX.md`가 목차, `mds/spec/seed.md`가 명세 SSoT).
+
+## 🎵 크레딧(사운드)
+
+- 엔진음: "225 Slant Six" by **Scheinwerfermann**, via Wikimedia Commons, licensed under **CC BY-SA 4.0**.
+  <https://commons.wikimedia.org/wiki/File:225_Slant_Six.ogg>
+- 변속음: "Clickick switch", via Wikimedia Commons, Public domain.
+  <https://commons.wikimedia.org/wiki/File:Clickick_switch.ogg>
 
 ## 🛠️ 기술 스택
 

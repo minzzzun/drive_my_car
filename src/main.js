@@ -14,7 +14,9 @@ import { createHud } from './render/hud.js';
 import { createGearstick } from './render/gearstick.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.js';
+import { MAX_RPM } from './vehicle/engine.js';
 import { terrainNormal } from './vehicle/dynamics.js';
+import { createAudio } from './render/audio.js';
 
 // ══════════════════════════════════════════════════════════════
 // 상수 (지형 상수·함수는 terrain.js 에서 import)
@@ -91,12 +93,16 @@ const overlay = document.getElementById('overlay');
 let started   = false;
 let paused    = false;
 
+// 사운드 시스템 (엔진음 + 변속음). AudioContext는 사용자 제스처(오버레이 click)에서 생성.
+const audio = createAudio({ maxRpm: MAX_RPM });
+
 // 오버레이 클릭 → 시작 또는 (일시정지에서) 재개
 overlay.addEventListener('click', function() {
   started = true;
   paused = false;
   overlay.style.display = 'none';
   renderer.domElement.requestPointerLock?.();
+  audio.resume();  // 사용자 제스처 시점에 AudioContext 생성/resume + 변속음 로드 시작
 });
 
 // 주행 중 일시정지 → 오버레이(설정창) 표시 + 포인터 락 해제
@@ -109,6 +115,7 @@ function pauseGame() {
 
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Escape') { pauseGame(); return; }
+  if (e.code === 'KeyM') { audio.toggleMute(); return; }
   if (e.code === 'Digit4' || e.code === 'Numpad4') {
     cameraMode = cameraMode === 'first' ? 'third' : 'first';
     return;
@@ -204,12 +211,20 @@ const SCORING_ENABLED = false;
 let cameraMode = 'first';
 
 let clutchIn = false;  // 기어봉 UI 표시용 (클러치 충분히 밟힘)
+let prevGear = vehicle.gear;  // 변속 감지용(초기 0=N) — 시작 직후 의도치 않은 변속음 방지
 
 function updateVehicle(dt) {
   const controls = readControls(input);
   clutchIn = (1 - controls.clutchPedal) <= CLUTCH_SHIFT_MAX;
   vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
   const d = vehicle.dyn;
+
+  // ── 사운드: 엔진음(매 프레임) + 변속음(기어 변화 순간 1회) ──────
+  audio.update(vehicle.rpm, vehicle.on);
+  if (vehicle.gear !== prevGear) {
+    audio.onShift();
+    prevGear = vehicle.gear;
+  }
 
   // ── 채점 엣지 이벤트 감지 (테스트용으로 임시 비활성 가능) ──────
   if (SCORING_ENABLED) {
