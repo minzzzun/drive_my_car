@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 import { createNaturalMap } from './naturalMap.js';
 import { createCityMap } from './cityMap.js';
+import { createPohangMap } from './pohangMap.js';
 
 const DEFAULT_MAP_ID = 'natural';
 
@@ -12,12 +13,14 @@ const DEFAULT_MAP_ID = 'natural';
 const MAP_FACTORIES = {
   natural: createNaturalMap,
   city: createCityMap,
+  pohang: createPohangMap,
 };
 
 // 라벨(시작 화면 표시용) — 맵 인스턴스를 만들지 않고도 목록을 보이기 위함
 const MAP_LABELS = {
   natural: '자연 지형',
   city: '도시',
+  pohang: '포항',
 };
 
 // id 로 맵 객체 생성. 알 수 없거나 누락이면 기본값(natural).
