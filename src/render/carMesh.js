@@ -17,6 +17,10 @@ export const DEFAULT_MESH = {
 // 화물 박스 색(택배 톤). M17 미션 다양화 때 opts.color 로 확장 여지.
 export const CARGO_COLOR = 0x9c6b3f;
 
+// 등화(램프) 색 — off(어두움)/on(발광). MeshBasicMaterial 이라 조명 무관. (M19b)
+export const LAMP_OFF = { brake: 0x330000, reverse: 0x333333, turn: 0x3a2a00 };
+export const LAMP_ON  = { brake: 0xff0000, reverse: 0xffffff, turn: 0xffaa00 };
+
 // carType 은 mesh 객체(예: CAR_TYPES.truck.mesh) 또는 mesh 를 품은 차종 객체.
 export function buildCar(carType = {}) {
   const m = { ...DEFAULT_MESH, ...(carType.mesh ?? carType) };
@@ -74,7 +78,46 @@ export function buildCar(carType = {}) {
   cargo.visible = false;  // 회귀 0: 기본 외형 그대로, 픽업 시 켜짐
   car.add(cargo);
 
+  // ── 후미 등화(램프 6개) — 작은 Box + MeshBasicMaterial, 기본 off색 (M19b) ──
+  const lampW = m.bodyWidth * 0.12;
+  const lampH = Math.max(0.12, m.bodyHeight * 0.35);
+  const lampD = 0.08;                       // 얇게(차 뒷면에 붙은 느낌)
+  const zRear = -m.bodyLen / 2 + 0.05;      // 후미(−Z) 살짝 안쪽
+  const lampY = m.bodyHeight * 0.5;         // 섀시 측면 높이
+  function addLamp(name, x, offColor) {
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(lampW, lampH, lampD),
+      new THREE.MeshBasicMaterial({ color: offColor }),
+    );
+    lamp.name = name;
+    lamp.position.set(x, lampY, zRear);
+    car.add(lamp);
+  }
+  // 후진등은 안쪽(0.45), 브레이크등 중간(0.85), 방향지시등 바깥(0.95).
+  addLamp('brakeL',   -tr * 0.85, LAMP_OFF.brake);
+  addLamp('brakeR',    tr * 0.85, LAMP_OFF.brake);
+  addLamp('reverseL', -tr * 0.45, LAMP_OFF.reverse);
+  addLamp('reverseR',  tr * 0.45, LAMP_OFF.reverse);
+  addLamp('turnL',    -tr * 0.95, LAMP_OFF.turn);
+  addLamp('turnR',     tr * 0.95, LAMP_OFF.turn);
+
   return car;
+}
+
+// 등화 갱신 — state = { brake, reverse, turnLeft, turnRight }(불리언). (M19b)
+//   깜빡임은 호출 측(main)이 turnLeft/turnRight 의 on/off 를 시간으로 토글해 전달.
+//   각 램프 material.color 만 LAMP_ON/OFF 로 setHex(메시 생성/제거 없음). 미지정 키 = off.
+export function setLights(car, state = {}) {
+  const set = (name, on, onHex, offHex) => {
+    const l = car.getObjectByName(name);
+    if (l && l.material) l.material.color.setHex(on ? onHex : offHex);
+  };
+  set('brakeL',   !!state.brake,     LAMP_ON.brake,   LAMP_OFF.brake);
+  set('brakeR',   !!state.brake,     LAMP_ON.brake,   LAMP_OFF.brake);
+  set('reverseL', !!state.reverse,   LAMP_ON.reverse, LAMP_OFF.reverse);
+  set('reverseR', !!state.reverse,   LAMP_ON.reverse, LAMP_OFF.reverse);
+  set('turnL',    !!state.turnLeft,  LAMP_ON.turn,    LAMP_OFF.turn);
+  set('turnR',    !!state.turnRight, LAMP_ON.turn,    LAMP_OFF.turn);
 }
 
 // 화물 표시/숨김 토글 — mission.hasCargo 와 동기화.

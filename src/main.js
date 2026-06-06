@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from './terrain.js';
 import { createMission, currentTarget, stepMission, jobsFromPoints, ARRIVE_RADIUS, STOP_SPEED } from './mission.js';
-import { buildCar, updateCarTransform, setCargo } from './render/carMesh.js';
+import { buildCar, updateCarTransform, setCargo, setLights } from './render/carMesh.js';
 import { createMinimap } from './render/minimap.js';
 import { createBigmap } from './render/bigmap.js';
 import { createHud } from './render/hud.js';
@@ -11,6 +11,8 @@ import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.
 import { MAX_RPM } from './vehicle/engine.js';
 import { createAudio } from './render/audio.js';
 import { createBeacon } from './render/beacon.js';
+import { createCompass } from './render/compass.js';
+import { bearingToTarget } from './heading.js';
 import { getMap } from './maps/index.js';
 import { getCarType, DEFAULT_CAR_ID } from './vehicle/carTypes.js';
 
@@ -144,6 +146,10 @@ let cameraMode = 'first';
 let clutchIn = false;  // 기어봉 UI 표시용 (클러치 충분히 밟힘)
 let prevGear = 0;  // 변속 감지용(초기 0=N) — 시작 직후 의도치 않은 변속음 방지
 
+// 방향지시등 깜빡임 — 누적 시간으로 on 위상 계산(M19b).
+const BLINK_PERIOD = 0.45;  // 점멸 1주기(초)
+let blinkClock = 0;
+
 function updateVehicle(dt) {
   const controls = readControls(input);
   clutchIn = (1 - controls.clutchPedal) <= CLUTCH_SHIFT_MAX;
@@ -192,6 +198,16 @@ function updateVehicle(dt) {
   }
   // allDone 의 전체 완료 안내(결과 오버레이)는 updateHUD 가 추가 처리
 
+  // ── 차량 등화 — 브레이크(S)/후진(R 기어)/방향지시(조향+점멸) (M19b) ──
+  blinkClock += dt;
+  const blinkOn = (blinkClock % BLINK_PERIOD) < BLINK_PERIOD / 2;
+  setLights(car, {
+    brake:     controls.brake > 0,
+    reverse:   vehicle.gear === -1,
+    turnLeft:  controls.steer < 0 && blinkOn,
+    turnRight: controls.steer > 0 && blinkOn,
+  });
+
   // 차체 '천장' 방향(지형 법선) — 차량 정렬·카메라 up·조향축 기준
   const n = map.normalAt(d.x, d.z);
   updateCarTransform(car, d, n);
@@ -214,6 +230,7 @@ function updateVehicle(dt) {
 // HUD + 미니맵 + 결과 오버레이
 // ══════════════════════════════════════════════════════════════
 const hud       = createHud();
+const compass   = createCompass();   // 목표 방향 나침반(상단 고정)
 const gearstick = createGearstick();
 document.body.appendChild(gearstick.canvas);
 // minimap 은 맵 데이터에 의존하므로 startGame 에서 생성/부착
@@ -266,6 +283,11 @@ function updateHUD() {
     if (t) beacon.update({ x: t.x, y: map.heightAt(t.x, t.z), z: t.z }, mission.phase);
     else beacon.update(null, 'done');
   }
+
+  // 목표 방향 나침반 — 차량 heading 기준 상대각으로 화살표 회전(없으면 숨김)
+  compass.update(t
+    ? { visible: true, bearing: bearingToTarget(vehicle.dyn, t), distance: dist, phase: mission.phase, label: t.label }
+    : { visible: false });
 
   gearstick.draw(vehicle.gear, clutchIn);
 

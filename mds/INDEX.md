@@ -20,6 +20,7 @@
 - [m16-cargo-bigmap.md](design/m16-cargo-bigmap.md) — 화물 시각화 + 큰 지도 보기 설계.
 - [m17-mission-variety.md](design/m17-mission-variety.md) — 미션 다양화(화물 종류·운임·수익·경로) 설계.
 - [m18-pohang-map.md](design/m18-pohang-map.md) — 포항 실지형 맵(DEM 표고 + OSM 도로망) 설계.
+- [m19-arrow-lights.md](design/m19-arrow-lights.md) — 목표 방향 나침반 + 차량 등화 설계.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
 - [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
@@ -45,6 +46,7 @@
 - [m16-cargo-bigmap.md](done/m16-cargo-bigmap.md) — M16 화물 시각화+큰지도+정차 적재/하차, 전체 290 그린.
 - [m17-mission-variety.md](done/m17-mission-variety.md) — M17 미션 다양화(화물종류·운임·수익·mixed 경로), 전체 323 그린.
 - [m18-pohang-map.md](done/m18-pohang-map.md) — M18 포항 실지형 맵(SRTM 표고+OSM 도로, fetch 스크립트), 전체 356 그린. (도시 사실화 다리/신호/터널은 부자연스러워 롤백)
+- [m19-arrow-lights.md](done/m19-arrow-lights.md) — M19 목표 방향 나침반 + 차량 등화(브레이크/후진/방향지시), 전체 385 그린.
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -70,3 +72,4 @@
 | M16 | 화물 시각화 + 큰지도 + 정차 적재 | ✅ 완료 | [done/m16-cargo-bigmap.md](done/m16-cargo-bigmap.md) |
 | M17 | 미션 다양화(화물·운임·수익·경로) | ✅ 완료 | [done/m17-mission-variety.md](done/m17-mission-variety.md) |
 | M18 | 포항 실지형 맵(DEM+OSM) | ✅ 완료 | [done/m18-pohang-map.md](done/m18-pohang-map.md) |
+| M19 | 목표 방향 나침반 + 차량 등화 | ✅ 완료 | [done/m19-arrow-lights.md](done/m19-arrow-lights.md) |

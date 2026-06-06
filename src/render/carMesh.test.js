@@ -1,7 +1,14 @@
 // render/carMesh.js 단위 테스트 (M6, M13b) — THREE 객체는 WebGL 없이 생성 가능
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { buildCar, updateCarTransform, setCargo } from './carMesh.js';
+import {
+  buildCar,
+  updateCarTransform,
+  setCargo,
+  setLights,
+  LAMP_ON,
+  LAMP_OFF,
+} from './carMesh.js';
 import { CAR_TYPES } from '../vehicle/carTypes.js';
 
 // ── M13b 테스트 헬퍼 ───────────────────────────────────────────
@@ -224,5 +231,184 @@ describe('updateCarTransform', () => {
     expect(u.x).toBeCloseTo(up.x, 5);
     expect(u.y).toBeCloseTo(up.y, 5);
     expect(u.z).toBeCloseTo(up.z, 5);
+  });
+});
+
+// ── M19b: 차량 등화(램프 6개) ─────────────────────────────────────
+// 기대 시그니처(설계 m19-arrow-lights.md §"항목 #2 — 차량 등화" 기준 가정):
+//   - buildCar(carType) 가 후미 램프 6개 child(작은 BoxGeometry, MeshBasicMaterial)를
+//     추가. name = brakeL/brakeR/reverseL/reverseR/turnL/turnR.
+//   - 기본 색은 모두 off (LAMP_OFF.{brake,reverse,turn}).
+//   - 위치(차 로컬): 후미 = -Z(z<0), 좌=음수 x / 우=양수 x.
+//       브레이크등 x = ±(trackHalf*0.85), 후진등 x = ±(trackHalf*0.45)(더 안쪽),
+//       방향지시등 x = ±(trackHalf*0.95)(가장 바깥).
+//       후미 z = zRear = -bodyLen/2 + 0.05, y = bodyHeight*0.5.
+//   - 램프 크기: lampW = bodyWidth*0.12 (차종 비례 → 트럭이 더 큼).
+//   - setLights(car, state) — state = { brake, reverse, turnLeft, turnRight }(불리언).
+//       각 램프 material.color 를 LAMP_ON/OFF 로 토글. 미지정 키는 off.
+//   - 상수 named export: LAMP_ON / LAMP_OFF ({ brake, reverse, turn } 각 hex).
+const LAMP_NAMES = ['brakeL', 'brakeR', 'reverseL', 'reverseR', 'turnL', 'turnR'];
+
+function lampOf(car, name) {
+  return car.getObjectByName(name);
+}
+
+describe('buildCar 등화(램프) child', () => {
+  it('후미 램프 6개(brakeL/brakeR/reverseL/reverseR/turnL/turnR)를 가진다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    for (const name of LAMP_NAMES) {
+      const lamp = lampOf(car, name);
+      expect(lamp, name).toBeDefined();
+      expect(lamp.geometry, name).toBeInstanceOf(THREE.BoxGeometry);
+      // 조명 무관 발광 느낌 → MeshBasicMaterial.
+      expect(lamp.material, name).toBeInstanceOf(THREE.MeshBasicMaterial);
+    }
+  });
+
+  it('기본 색이 모두 off (LAMP_OFF.*) 이다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_OFF.brake);
+    expect(lampOf(car, 'brakeR').material.color.getHex()).toBe(LAMP_OFF.brake);
+    expect(lampOf(car, 'reverseL').material.color.getHex()).toBe(LAMP_OFF.reverse);
+    expect(lampOf(car, 'reverseR').material.color.getHex()).toBe(LAMP_OFF.reverse);
+    expect(lampOf(car, 'turnL').material.color.getHex()).toBe(LAMP_OFF.turn);
+    expect(lampOf(car, 'turnR').material.color.getHex()).toBe(LAMP_OFF.turn);
+  });
+
+  it('램프가 후미(z<0)에 위치한다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    for (const name of LAMP_NAMES) {
+      expect(lampOf(car, name).position.z, name).toBeLessThan(0);
+    }
+  });
+
+  it('좌측 램프는 x<0, 우측 램프는 x>0 (좌우 부호)', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    for (const name of ['brakeL', 'reverseL', 'turnL']) {
+      expect(lampOf(car, name).position.x, name).toBeLessThan(0);
+    }
+    for (const name of ['brakeR', 'reverseR', 'turnR']) {
+      expect(lampOf(car, name).position.x, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('후진등이 브레이크등보다 안쪽이다 (|reverse.x| < |brake.x|)', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    expect(Math.abs(lampOf(car, 'reverseL').position.x)).toBeLessThan(
+      Math.abs(lampOf(car, 'brakeL').position.x),
+    );
+    expect(Math.abs(lampOf(car, 'reverseR').position.x)).toBeLessThan(
+      Math.abs(lampOf(car, 'brakeR').position.x),
+    );
+  });
+
+  it('방향지시등이 브레이크등보다 바깥쪽이다 (|turn.x| > |brake.x|)', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    expect(Math.abs(lampOf(car, 'turnL').position.x)).toBeGreaterThan(
+      Math.abs(lampOf(car, 'brakeL').position.x),
+    );
+    expect(Math.abs(lampOf(car, 'turnR').position.x)).toBeGreaterThan(
+      Math.abs(lampOf(car, 'brakeR').position.x),
+    );
+  });
+
+  it('트럭 램프가 승용차보다 크고 더 넓고/뒤에 있다 (차종 비례)', () => {
+    const sedan = buildCar(CAR_TYPES.sedan.mesh);
+    const truck = buildCar(CAR_TYPES.truck.mesh);
+    // 램프 폭(lampW = bodyWidth*0.12) → 트럭이 더 큼.
+    expect(lampOf(truck, 'brakeL').geometry.parameters.width).toBeGreaterThan(
+      lampOf(sedan, 'brakeL').geometry.parameters.width,
+    );
+    // 좌우 바깥쪽 거리(±trackHalf 비례) → 트럭이 더 넓음.
+    expect(Math.abs(lampOf(truck, 'brakeR').position.x)).toBeGreaterThan(
+      Math.abs(lampOf(sedan, 'brakeR').position.x),
+    );
+    // 후미 z(= -bodyLen/2 + 0.05) → 트럭이 더 뒤(더 음수).
+    expect(lampOf(truck, 'brakeL').position.z).toBeLessThan(
+      lampOf(sedan, 'brakeL').position.z,
+    );
+  });
+
+  it('램프 폭이 설계 산출식(bodyWidth*0.12)을 따른다', () => {
+    const m = CAR_TYPES.truck.mesh;
+    const car = buildCar(m);
+    expect(lampOf(car, 'brakeL').geometry.parameters.width).toBeCloseTo(
+      m.bodyWidth * 0.12,
+      6,
+    );
+  });
+
+  it('램프 6개가 늘어도 children.length >= 6 유지 — 회귀 0', () => {
+    const car = buildCar();
+    // 섀시1 + 캐빈1 + 바퀴4 + 화물1 + 램프6 = 13 (>=6)
+    expect(car.children.length).toBeGreaterThanOrEqual(6);
+    for (const name of LAMP_NAMES) {
+      expect(lampOf(car, name), name).toBeDefined();
+    }
+  });
+});
+
+describe('setLights', () => {
+  it('brake on/off 토글 → brakeL/brakeR 색이 LAMP_ON/OFF.brake 로 바뀐다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { brake: true });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_ON.brake);
+    expect(lampOf(car, 'brakeR').material.color.getHex()).toBe(LAMP_ON.brake);
+    setLights(car, { brake: false });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_OFF.brake);
+    expect(lampOf(car, 'brakeR').material.color.getHex()).toBe(LAMP_OFF.brake);
+  });
+
+  it('reverse on/off 토글 → reverseL/reverseR 색이 LAMP_ON/OFF.reverse', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { reverse: true });
+    expect(lampOf(car, 'reverseL').material.color.getHex()).toBe(LAMP_ON.reverse);
+    expect(lampOf(car, 'reverseR').material.color.getHex()).toBe(LAMP_ON.reverse);
+    setLights(car, { reverse: false });
+    expect(lampOf(car, 'reverseL').material.color.getHex()).toBe(LAMP_OFF.reverse);
+    expect(lampOf(car, 'reverseR').material.color.getHex()).toBe(LAMP_OFF.reverse);
+  });
+
+  it('turnLeft/turnRight 가 각각 독립적으로 turnL/turnR 만 토글한다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { turnLeft: true });
+    expect(lampOf(car, 'turnL').material.color.getHex()).toBe(LAMP_ON.turn);
+    expect(lampOf(car, 'turnR').material.color.getHex()).toBe(LAMP_OFF.turn);
+    setLights(car, { turnRight: true });
+    expect(lampOf(car, 'turnL').material.color.getHex()).toBe(LAMP_OFF.turn);
+    expect(lampOf(car, 'turnR').material.color.getHex()).toBe(LAMP_ON.turn);
+  });
+
+  it('미지정 키는 off 로 정규화된다', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { brake: true, reverse: true, turnLeft: true, turnRight: true });
+    // 빈 state → 전부 off.
+    setLights(car, {});
+    for (const name of LAMP_NAMES) {
+      const off = name.startsWith('brake')
+        ? LAMP_OFF.brake
+        : name.startsWith('reverse')
+        ? LAMP_OFF.reverse
+        : LAMP_OFF.turn;
+      expect(lampOf(car, name).material.color.getHex(), name).toBe(off);
+    }
+  });
+
+  it('truthy/falsy 인자를 boolean 으로 정규화', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { brake: 1 });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_ON.brake);
+    setLights(car, { brake: 0 });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_OFF.brake);
+  });
+
+  it('반복 호출도 안전(idempotent)', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    setLights(car, { brake: true });
+    setLights(car, { brake: true });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_ON.brake);
+    setLights(car, { brake: false });
+    setLights(car, { brake: false });
+    expect(lampOf(car, 'brakeL').material.color.getHex()).toBe(LAMP_OFF.brake);
   });
 });
