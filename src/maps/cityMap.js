@@ -100,6 +100,24 @@ export function createCityMap() {
     goals.push({ index: k - 1, x: 0, z: k * CELL });
   }
 
+  // 배송 지점 — 격자 교차점 고정 목록 (스폰(0,0) 제외, 전부 도로 위, 결정론)
+  //   (i*CELL, j*CELL) 형태 → 항상 교차로(도로) 위.
+  const deliveryGrid = [
+    { i: 0, j: 2, label: '북부 창고' },
+    { i: 2, j: 2, label: '동북 물류센터' },
+    { i: 2, j: 0, label: '동부 시장' },
+    { i: 2, j: -2, label: '동남 항만' },
+    { i: 0, j: -2, label: '남부 터미널' },
+    { i: -2, j: -1, label: '서남 공단' },
+    { i: -2, j: 1, label: '서부 역' },
+    { i: -1, j: 3, label: '중앙 교차로' },
+  ];
+  const deliveryPoints = deliveryGrid.map((g) => ({
+    x: g.i * CELL,
+    z: g.j * CELL,
+    label: g.label,
+  }));
+
   return {
     id: 'city',
     label: '도시',
@@ -119,6 +137,11 @@ export function createCityMap() {
 
     // ── 목표 지점 (순수) ─────────────────────────────────
     getGoals() { return goals; },
+
+    // ── 배송 지점 (순수, 결정론) — 격자 교차점들(스폰 제외, 도로 위) ──
+    getDeliveryPoints() {
+      return deliveryPoints.map((p) => ({ x: p.x, z: p.z, label: p.label }));
+    },
 
     getSpawn() {
       // 교차로(0,0) — heading 0 (+Z, z축 도로를 따라)

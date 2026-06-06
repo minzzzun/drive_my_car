@@ -30,12 +30,12 @@ export function worldToMinimap(wx, wz, view) {
 }
 
 // 캔버스 미니맵 생성 (통일 데이터 포맷 소비) ──────────────────────
-//   data = { polylines:[[{x,z}...]], goals:[{x,z}], bounds }
+//   data = { polylines:[[{x,z}...]], bounds }
 //   bounds 가 null 이면 polylines 의 모든 점으로부터 계산.
+//   목표 마커는 main 이 draw 인자(missionMarker)로 넘긴다(goals 의존 제거).
 export function createMinimap(data, opts = {}) {
   const size = opts.size ?? 160;
   const polylines = data.polylines ?? [];
-  const goals = data.goals ?? [];
 
   const canvas = document.createElement('canvas');
   canvas.id = 'minimap';
@@ -52,7 +52,8 @@ export function createMinimap(data, opts = {}) {
   const bounds = data.bounds ?? computeBounds(allPts, 20);
   const view = { bounds, size };
 
-  function draw(dyn, score) {
+  // missionMarker = { pickup:{x,z}|null, dropoff:{x,z}|null, phase }
+  function draw(dyn, missionMarker) {
     ctx.clearRect(0, 0, size, size);
 
     // 도로/격자 폴리라인
@@ -67,15 +68,27 @@ export function createMinimap(data, opts = {}) {
       ctx.stroke();
     }
 
-    // 목표 지점 (현재 목표 강조)
-    goals.forEach((cp, i) => {
-      const p = worldToMinimap(cp.x, cp.z, view);
-      const current = score && i === score.nextCheckpoint;
-      ctx.fillStyle = current ? '#ffcc00' : (score && i < score.nextCheckpoint ? '#55aa55' : '#ff8800');
+    // ── 배송 마커: pickup(파랑) / dropoff(주황빨강), 현재 단계 목표 강조 ──
+    const mk = missionMarker ?? {};
+    // 단일 마커 그리기 헬퍼 — 현재 단계 목표면 크게(강조), 아니면 작게
+    function marker(pt, color, active) {
+      if (!pt) return;
+      const p = worldToMinimap(pt.x, pt.z, view);
+      ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(p.mx, p.my, current ? 5 : 3, 0, Math.PI * 2);
+      ctx.arc(p.mx, p.my, active ? 7 : 3, 0, Math.PI * 2);
       ctx.fill();
-    });
+      // 강조 외곽선
+      if (active) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.mx, p.my, 10, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    marker(mk.pickup, '#33aaff', mk.phase === 'toPickup');
+    marker(mk.dropoff, '#ff5533', mk.phase === 'toDropoff');
 
     // 차량 (heading 방향 삼각형)
     const v = worldToMinimap(dyn.x, dyn.z, view);

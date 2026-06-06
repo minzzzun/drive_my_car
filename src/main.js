@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from './terrain.js';
-import { createScore, stepScore, CHECKPOINT_TIME } from './scoring.js';
+import { createMission, currentTarget, stepMission, jobsFromPoints } from './mission.js';
 import { buildCar, updateCarTransform } from './render/carMesh.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud } from './render/hud.js';
@@ -32,9 +32,8 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 // 게임 상태 (startGame 에서 맵 선택 후 채워짐)
 // ══════════════════════════════════════════════════════════════
 let map        = null;   // 현재 맵 (인터페이스 객체)
-let checkpoints = [];     // 채점/체크포인트 목표
 let vehicle    = null;
-let score      = null;
+let mission    = null;   // 배송 미션 상태
 let minimap    = null;
 
 // ══════════════════════════════════════════════════════════════
@@ -85,7 +84,7 @@ overlay.addEventListener('click', function() {
 
 // 주행 중 일시정지 → 오버레이(설정창) 표시 + 포인터 락 해제
 function pauseGame() {
-  if (!started || paused || !score || score.state !== 'driving') return;
+  if (!started || paused || !mission) return;
   paused = true;
   overlay.style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock?.();
@@ -112,16 +111,6 @@ document.addEventListener('pointerlockchange', function() {
 // 차량 메시 (1인칭 주행) — 차종에 맞춰 startGame 에서 (재)생성
 // ══════════════════════════════════════════════════════════════
 let car = null;
-
-// 채점 엣지 감지용 이전값
-let prevOnRoad = true;
-let prevCollide = false;
-
-const CHECKPOINT_RADIUS = 6;   // 체크포인트 진입 반경
-const COLLISION_TILT    = 0.5; // 경미 충돌로 보는 기울기(전복 미만)
-
-// 테스트용: 점수 제도(감점/게임오버) 임시 비활성. true 로 바꾸면 채점 복구.
-const SCORING_ENABLED = false;
 
 // 카메라 시점: 'first'(1인칭) | 'third'(3인칭). 숫자 4로 토글.
 let cameraMode = 'first';
@@ -154,26 +143,16 @@ function updateVehicle(dt) {
     prevGear = vehicle.gear;
   }
 
-  // ── 채점 엣지 이벤트 감지 (테스트용으로 임시 비활성 가능) ──────
-  if (SCORING_ENABLED) {
-    const onRoad  = map.isOnRoad(d.x, d.z);
-    const tilt    = Math.max(Math.abs(d.roll), Math.abs(d.pitch));
-    const collide = tilt > COLLISION_TILT && !vehicle.rollover && Math.abs(vehicle.speed) > 2;
-    const target  = checkpoints[score.nextCheckpoint];
-    const reached = !!target && Math.hypot(d.x - target.x, d.z - target.z) < CHECKPOINT_RADIUS;
-
-    score = stepScore(score, {
-      rollover: vehicle.rollover,
-      majorCollision: false,
-      stalled: vehicle.justStalled,
-      offRoad: prevOnRoad && !onRoad,
-      collision: !prevCollide && collide,
-      reachedCheckpoint: reached,
-    }, dt);
-
-    prevOnRoad = onRoad;
-    prevCollide = collide;
+  // ── 배송 미션 전진 — 도착 시 토스트 안내(채점/감점 없음) ──────────
+  const { state: nextMission, event } = stepMission(mission, { x: d.x, z: d.z });
+  mission = nextMission;
+  if (event === 'pickedUp') {
+    const t = currentTarget(mission);   // 적재 후 현재 목표 = 배송지
+    hud.showToast(`📦 짐을 실었습니다 — ${t ? t.label : ''}(으)로!`);
+  } else if (event === 'delivered') {
+    hud.showToast(`✅ 배송 완료! (${mission.completed}/${mission.total})`);
   }
+  // event === 'allDone' 은 결과 오버레이(updateHUD)가 처리
 
   // 차체 '천장' 방향(지형 법선) — 차량 정렬·카메라 up·조향축 기준
   const n = map.normalAt(d.x, d.z);
@@ -211,16 +190,38 @@ document.body.appendChild(result);
 
 function updateHUD() {
   if (!vehicle) return;  // startGame 전엔 그릴 대상이 없음
-  hud.update(vehicle, score);
-  minimap.draw(vehicle.dyn, score);
+
+  // ── 현재 목표 + 거리 → 배송 HUD ──
+  const t = currentTarget(mission);
+  const dist = t ? Math.hypot(vehicle.dyn.x - t.x, vehicle.dyn.z - t.z) : 0;
+  hud.update(vehicle, {
+    phase: mission.phase,
+    label: t ? t.label : '',
+    distance: dist,
+    hasCargo: mission.hasCargo,
+    completed: mission.completed,
+    total: mission.total,
+  });
+
+  // ── 미니맵 마커: 현재 단계 목표를 pickup/dropoff 슬롯에 배치 ──
+  let marker;
+  if (!t) {
+    marker = { pickup: null, dropoff: null, phase: 'done' };
+  } else if (mission.phase === 'toPickup') {
+    marker = { pickup: t, dropoff: null, phase: mission.phase };
+  } else {
+    marker = { pickup: null, dropoff: t, phase: mission.phase };
+  }
+  minimap.draw(vehicle.dyn, marker);
+
   gearstick.draw(vehicle.gear, clutchIn);
 
-  if (SCORING_ENABLED && score.state !== 'driving' && result.style.display === 'none') {
-    const pass = score.state === 'passed';
+  // ── 전체 배송 완료 안내(1회) — 탈락 없음, 자유주행은 계속 ──
+  if (mission.phase === 'done' && result.style.display === 'none') {
     result.style.display = 'flex';
     result.innerHTML =
-      `<div>${pass ? '🎉 합격!' : '❌ 불합격'}<br>` +
-      `<span style="font-size:20px">최종 점수 ${score.score}점</span><br>` +
+      `<div>🎉 모든 배송 완료!<br>` +
+      `<span style="font-size:20px">${mission.completed}건 배송</span><br>` +
       `<span style="font-size:15px;opacity:.7">새로고침(F5)하여 다시 도전</span></div>`;
   }
 }
@@ -251,8 +252,7 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   car = buildCar(carType.mesh);
   scene.add(car);
 
-  // 코스/목표·정적 씬(코스 메시·조명·배경·포그) 구성
-  checkpoints = map.getGoals();
+  // 정적 씬(코스 메시·조명·배경·포그) 구성
   map.buildStatic(scene);
 
   // 스폰(위치+heading+y) — 차량/카메라 배치
@@ -260,8 +260,9 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   vehicle = createVehicle({ x: spawn.x, z: spawn.z, y: spawn.y, heading: spawn.heading }, carType.perf);
   prevGear = vehicle.gear;
 
-  // 채점 상태
-  score = createScore({ totalCheckpoints: checkpoints.length, timeLimit: CHECKPOINT_TIME });
+  // 배송 미션(순수 운송) — 맵 배송지점 → 체이닝 job
+  mission = createMission(jobsFromPoints(map.getDeliveryPoints()));
+  result.style.display = 'none';
 
   // 미니맵(통일 데이터 소비) 생성/부착
   minimap = createMinimap(map.getMinimapData());
@@ -283,7 +284,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (started && !paused && score && score.state === 'driving') updateVehicle(dt);
+  if (started && !paused && mission) updateVehicle(dt);
 
   if (map) {
     const pcx = Math.floor(camera.position.x / CHUNK_SIZE);

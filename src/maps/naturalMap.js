@@ -81,6 +81,17 @@ export function createNaturalMap() {
     // ── 목표 지점 (순수) ─────────────────────────────────
     getGoals() { return checkpoints; },
 
+    // ── 배송 지점 (순수, 결정론) ─────────────────────────
+    //   도로 중심선 등간격 점(placeCheckpoints 재사용) → 전부 도로 위 보장.
+    getDeliveryPoints() {
+      const pts = placeCheckpoints(road, 6);
+      return pts.map((p, i) => ({
+        x: p.x,
+        z: p.z,
+        label: `지점 ${String.fromCharCode(65 + i)}`,  // '지점 A', '지점 B', ...
+      }));
+    },
+
     getSpawn() {
       const pos  = road.waypoints[0];
       const next = road.waypoints[1] ?? { x: pos.x, z: pos.z + 1 };
