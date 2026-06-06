@@ -19,6 +19,11 @@ import { getCarType, DEFAULT_CAR_ID } from './vehicle/carTypes.js';
 // ══════════════════════════════════════════════════════════════
 let EYE_HEIGHT = 1.2;  // 운전석 눈높이 (차량 원점 위) — 선택 차종에 따라 변경
 
+// ₩ 천 단위 구분 표기(토스트/오버레이용).
+function wonStr(n) {
+  return '₩' + Math.round(n ?? 0).toLocaleString('ko-KR');
+}
+
 // ══════════════════════════════════════════════════════════════
 // Three.js 초기화
 // ══════════════════════════════════════════════════════════════
@@ -165,17 +170,27 @@ function updateVehicle(dt) {
   }
 
   // ── 배송 미션 전진 — 도착 시 토스트 안내(채점/감점 없음) ──────────
-  const { state: nextMission, event } = stepMission(mission, { x: d.x, z: d.z }, { speed: vehicle.speed });
+  // 전이 전 현재 job(화물) 보관 — delivered 시 index 가 바뀌므로 미리 잡는다.
+  const activeJob = mission.jobs[mission.index];
+  const { state: nextMission, event, fare } = stepMission(mission, { x: d.x, z: d.z }, { speed: vehicle.speed });
   mission = nextMission;
   if (event === 'pickedUp') {
-    setCargo(car, true);                 // 적재함에 박스 표시
+    const cargo = activeJob?.cargo;
+    setCargo(car, true, cargo?.color);   // 적재함에 화물 종류색 박스 표시
     const t = currentTarget(mission);   // 적재 후 현재 목표 = 배송지
-    hud.showToast(`📦 짐을 실었습니다 — ${t ? t.label : ''}(으)로!`);
-  } else if (event === 'delivered') {
+    const cargoLabel = cargo ? `${cargo.icon} ${cargo.label}` : '짐';
+    const fareTxt = fare ?? activeJob?.fare;
+    hud.showToast(
+      `📦 ${cargoLabel} 적재 — ${t ? t.label : ''}(으)로!` +
+      (fareTxt != null ? ` (운임 ${wonStr(fareTxt)})` : ''),
+    );
+  } else if (event === 'delivered' || event === 'allDone') {
     setCargo(car, false);                // 하차 → 박스 숨김
-    hud.showToast(`✅ 배송 완료! (${mission.completed}/${mission.total})`);
+    hud.showToast(
+      `✅ 배송 완료! +${wonStr(fare ?? 0)} (누적 ${wonStr(mission.earnings)})`,
+    );
   }
-  // event === 'allDone' 은 결과 오버레이(updateHUD)가 처리
+  // allDone 의 전체 완료 안내(결과 오버레이)는 updateHUD 가 추가 처리
 
   // 차체 '천장' 방향(지형 법선) — 차량 정렬·카메라 up·조향축 기준
   const n = map.normalAt(d.x, d.z);
@@ -219,6 +234,8 @@ function updateHUD() {
   const dist = t ? Math.hypot(vehicle.dyn.x - t.x, vehicle.dyn.z - t.z) : 0;
   // 목표 반경 안인데 아직 달리는 중이면 "정차하세요" 안내
   const needStop = !!t && dist < ARRIVE_RADIUS && Math.abs(vehicle.speed) > STOP_SPEED;
+  // 현재 진행 중 job 의 화물/운임(있으면)
+  const curJob = mission.jobs[mission.index];
   hud.update(vehicle, {
     phase: mission.phase,
     label: t ? t.label : '',
@@ -226,6 +243,10 @@ function updateHUD() {
     hasCargo: mission.hasCargo,
     completed: mission.completed,
     total: mission.total,
+    cargoIcon: curJob?.cargo?.icon,
+    cargoLabel: curJob?.cargo?.label,
+    fare: curJob?.fare,
+    earnings: mission.earnings,
     needStop,
   });
 
@@ -253,7 +274,7 @@ function updateHUD() {
     result.style.display = 'flex';
     result.innerHTML =
       `<div>🎉 모든 배송 완료!<br>` +
-      `<span style="font-size:20px">${mission.completed}건 배송</span><br>` +
+      `<span style="font-size:20px">${mission.completed}건 배송 · 총수익 ${wonStr(mission.earnings)}</span><br>` +
       `<span style="font-size:15px;opacity:.7">새로고침(F5)하여 다시 도전</span></div>`;
   }
 }
@@ -293,8 +314,8 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   vehicle = createVehicle({ x: spawn.x, z: spawn.z, y: spawn.y, heading: spawn.heading }, carType.perf);
   prevGear = vehicle.gear;
 
-  // 배송 미션(순수 운송) — 맵 배송지점 → 체이닝 job
-  mission = createMission(jobsFromPoints(map.getDeliveryPoints()));
+  // 배송 미션(순수 운송) — 맵 배송지점 → 결정론 셔플 쌍(거리 편차↑, M17)
+  mission = createMission(jobsFromPoints(map.getDeliveryPoints(), { mode: 'mixed' }));
   result.style.display = 'none';
 
   // 미니맵(통일 데이터 소비) 생성/부착

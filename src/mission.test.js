@@ -32,17 +32,34 @@
 //     getMap('natural').getDeliveryPoints() / getMap('city').getDeliveryPoints()
 //       → [{ x, z, label }] (도로 위, 결정론, ≥4점)
 //
+// ── M17a 확장 (mds/design/m17-mission-variety.md §2·§3·§4·§6.2) ────
+//   추가로 가정한 export 시그니처:
+//     FARE_BASE                       // 운임 기본 출장비(₩). 설계 §2.2 = 3000
+//     jobDistance(job)                // → pickup↔dropoff 직선거리(Math.hypot)
+//     computeFare(distanceM, baseRate)// → Math.round(FARE_BASE + distanceM*baseRate)
+//     enrichJob(job)                  // → {...job, cargo, distance, fare} (멱등)
+//     jobsFromPoints(points, {mode:'mixed'}) // 결정론 셔플 쌍, floor(N/2) job
+//   추가 동작:
+//     · jobsFromPoints 결과 job 에 cargo/distance/fare 부여(enrichJob 경유)
+//     · createMission(...).earnings === 0 (신규 누적 수익 필드)
+//     · stepMission delivered/allDone 반환에 fare 포함 + state.earnings 가산
+//
 // 모두 구현 전이므로 RED 가 정상이다.
 // ══════════════════════════════════════════════════════════════
 import { describe, it, expect } from 'vitest';
 import {
   ARRIVE_RADIUS,
   STOP_SPEED,
+  FARE_BASE,
   createMission,
   currentTarget,
   stepMission,
   jobsFromPoints,
+  jobDistance,
+  computeFare,
+  enrichJob,
 } from './mission.js';
+import { CARGO_TYPES } from './cargoTypes.js';
 import { getMap } from './maps/index.js';
 
 // 테스트용 job 빌더 — 픽업/드롭오프가 서로/스폰과 충분히 떨어지게 좌표 분리.
@@ -307,6 +324,9 @@ describe('jobsFromPoints — 체이닝(기본)', () => {
     }
   });
 
+  // M17a 회귀(설계 §7): enrichJob 은 pickup/dropoff 점 객체를 변형하지 않고 그대로
+  //   spread 하므로 job.dropoff·job.pickup 은 원본 점 객체(label 포함) 그대로 남는다.
+  //   cargo/distance/fare 가 추가돼도 이 toEqual 은 유지된다(키 비교 대상 동일).
   it('이전 dropoff = 다음 pickup (체이닝 규칙)', () => {
     const jobs = jobsFromPoints(points);
     for (let i = 0; i < jobs.length - 1; i++) {
@@ -421,5 +441,237 @@ describe('getDeliveryPoints — 도시 맵', () => {
   it('#4 인접 배송점 간 최소 거리가 확대 임계(≥180m) 이상', () => {
     const pts = getMap('city').getDeliveryPoints();
     expect(minAdjacentDistance(pts)).toBeGreaterThanOrEqual(180);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// M17a 확장 케이스 (mds/design/m17-mission-variety.md §2·§3·§4·§6.2)
+//   운임/거리(enrichJob·computeFare·jobDistance), jobsFromPoints 보강,
+//   mode:'mixed', earnings 누적. 구현 전이므로 RED 가 정상.
+// ══════════════════════════════════════════════════════════════
+
+// pickup↔dropoff 직선거리 — 테스트 기대값 계산용(설계 §2.2 jobDistance 와 동일 식)
+function hyp(job) {
+  return Math.hypot(job.dropoff.x - job.pickup.x, job.dropoff.z - job.pickup.z);
+}
+
+describe('FARE_BASE / computeFare / jobDistance — 운임 공식(설계 §2.2)', () => {
+  it('FARE_BASE = 3000', () => {
+    expect(FARE_BASE).toBe(3000);
+  });
+
+  it('computeFare = round(FARE_BASE + distance × baseRate), 거리 0 이어도 양수', () => {
+    expect(computeFare(0, 12)).toBe(FARE_BASE);          // 거리 0 → 기본 출장비만
+    expect(computeFare(100, 12)).toBe(Math.round(FARE_BASE + 100 * 12));
+    expect(computeFare(0, 12)).toBeGreaterThan(0);
+    // 거리·계수가 커질수록 운임↑
+    expect(computeFare(200, 22)).toBeGreaterThan(computeFare(50, 9));
+  });
+
+  it('jobDistance = pickup↔dropoff 직선거리(Math.hypot)', () => {
+    const job = mkJob(0, 0, 30, 40);   // 3-4-5 → 50
+    expect(jobDistance(job)).toBeCloseTo(50, 6);
+  });
+});
+
+describe('enrichJob — cargo/distance/fare 부여(설계 §2.3)', () => {
+  it('cargo 는 CARGO_TYPES 중 하나(id 일치)', () => {
+    const ej = enrichJob(mkJob(10, 20, 300, 400));
+    expect(CARGO_TYPES.map((c) => c.id)).toContain(ej.cargo.id);
+  });
+
+  it('distance = pickup↔dropoff 직선거리', () => {
+    const job = mkJob(0, 0, 60, 80);   // → 100
+    expect(enrichJob(job).distance).toBeCloseTo(100, 6);
+  });
+
+  it('fare = computeFare(distance, cargo.baseRate) 이며 양수', () => {
+    const ej = enrichJob(mkJob(5, 5, 200, 300));
+    expect(ej.fare).toBe(computeFare(ej.distance, ej.cargo.baseRate));
+    expect(ej.fare).toBeGreaterThan(0);
+  });
+
+  it('pickup/dropoff 는 원본 그대로 보존(좌표 객체 변형 금지, 설계 §7)', () => {
+    const job = mkJob(11, 22, 33, 44, '창고', '역');
+    const ej = enrichJob(job);
+    expect(ej.pickup).toEqual(job.pickup);
+    expect(ej.dropoff).toEqual(job.dropoff);
+  });
+
+  it('결정론: 같은 입력 → 깊은 동등', () => {
+    const job = mkJob(7, 13, 17, 23);
+    expect(enrichJob(job)).toEqual(enrichJob(job));
+  });
+
+  it('멱등: 이미 cargo/distance/fare 가 있으면 보존', () => {
+    const fixed = {
+      pickup: { x: 0, z: 0, label: 'P' },
+      dropoff: { x: 10, z: 0, label: 'D' },
+      cargo: CARGO_TYPES[0],
+      distance: 999,
+      fare: 12345,
+    };
+    const ej = enrichJob(fixed);
+    expect(ej.cargo).toBe(fixed.cargo);
+    expect(ej.distance).toBe(999);
+    expect(ej.fare).toBe(12345);
+  });
+});
+
+describe('jobsFromPoints — cargo/distance/fare 보강(설계 §2.4)', () => {
+  const points = [
+    { x: 0, z: 0, label: 'A' },
+    { x: 100, z: 0, label: 'B' },
+    { x: 100, z: 150, label: 'C' },
+    { x: 250, z: 150, label: 'D' },
+  ];
+
+  it('각 job 에 cargo/distance/fare 필드가 존재(타입 검증)', () => {
+    const jobs = jobsFromPoints(points);
+    for (const j of jobs) {
+      expect(CARGO_TYPES.map((c) => c.id)).toContain(j.cargo.id);
+      expect(j.distance).toBeCloseTo(hyp(j), 6);
+      expect(j.fare).toBe(computeFare(j.distance, j.cargo.baseRate));
+      expect(j.fare).toBeGreaterThan(0);
+    }
+  });
+
+  it('결정론: 같은 입력 → 깊은 동등(보강 포함)', () => {
+    expect(jobsFromPoints(points)).toEqual(jobsFromPoints(points));
+  });
+});
+
+describe("jobsFromPoints — mode:'mixed'(설계 §3.2 결정론 셔플 쌍)", () => {
+  // 거리 편차를 키우려 일부러 멀고 가까운 점을 섞어 배치
+  const points = [
+    { x: 0, z: 0, label: 'A' },
+    { x: 5, z: 0, label: 'B' },
+    { x: 600, z: 0, label: 'C' },
+    { x: 605, z: 0, label: 'D' },
+    { x: 0, z: 600, label: 'E' },
+    { x: 5, z: 600, label: 'F' },
+  ];
+
+  it('floor(N/2) job', () => {
+    const jobs = jobsFromPoints(points, { mode: 'mixed' });
+    expect(jobs.length).toBe(Math.floor(points.length / 2));
+  });
+
+  it('결정론: 2회 호출 깊은 동등', () => {
+    expect(jobsFromPoints(points, { mode: 'mixed' }))
+      .toEqual(jobsFromPoints(points, { mode: 'mixed' }));
+  });
+
+  it('보강 필드(cargo/distance/fare) 부여', () => {
+    const jobs = jobsFromPoints(points, { mode: 'mixed' });
+    for (const j of jobs) {
+      expect(CARGO_TYPES.map((c) => c.id)).toContain(j.cargo.id);
+      expect(j.distance).toBeCloseTo(hyp(j), 6);
+      expect(j.fare).toBe(computeFare(j.distance, j.cargo.baseRate));
+    }
+  });
+
+  it('거리 편차가 순차 쌍(pairs)보다 큼 — 셔플로 멀고 가까운 쌍이 섞임(설계 §3.3)', () => {
+    // 참고: 체이닝은 인접쌍이라 우연히 가장 먼 쌍(D-E)을 흡수해 spread 가 최대치다.
+    //       어떤 완전매칭도 그보다 strictly 클 수 없으므로, 같은 "비겹침 쌍" 방식인
+    //       pairs 모드(여기선 전부 짧은 인접쌍 → 편차 0)와 비교해 셔플 효과를 검증한다.
+    const dists = (jobs) => jobs.map(hyp);
+    const spread = (jobs) => {
+      const d = dists(jobs);
+      return Math.max(...d) - Math.min(...d);
+    };
+    const pairs = jobsFromPoints(points, { mode: 'pairs' });   // 순차 비겹침 쌍(편차 작음)
+    const mixed = jobsFromPoints(points, { mode: 'mixed' });   // 셔플 비겹침 쌍
+    // mixed 는 먼 쌍을 끌어와 거리 편차가 순차 쌍보다 크다
+    expect(spread(mixed)).toBeGreaterThan(spread(pairs));
+  });
+});
+
+describe('createMission — earnings 초기값(설계 §4.1)', () => {
+  it('초기 earnings = 0', () => {
+    const s = createMission([mkJob(0, 100, 0, 200)]);
+    expect(s.earnings).toBe(0);
+  });
+
+  it('빈 jobs 여도 earnings = 0', () => {
+    expect(createMission([]).earnings).toBe(0);
+  });
+});
+
+describe('stepMission — earnings 누적 + fare 반환(설계 §4.2)', () => {
+  // fare 가 있는 job(enrichJob 거친 형태)을 직접 구성해 누적 검증
+  function fareJob(px, pz, dx, dz, fare) {
+    return {
+      pickup: { x: px, z: pz, label: 'P' },
+      dropoff: { x: dx, z: dz, label: 'D' },
+      cargo: CARGO_TYPES[0],
+      distance: Math.hypot(dx - px, dz - pz),
+      fare,
+    };
+  }
+
+  it('pickedUp 시 earnings 불변 + fare 미가산(적재 시점엔 수익 없음)', () => {
+    const m = createMission([fareJob(0, 100, 0, 200, 5000)]);
+    const r = stepMission(m, at(m.jobs[0].pickup));
+    expect(r.event).toBe('pickedUp');
+    expect(r.state.earnings).toBe(0);
+    // fare 동봉되더라도 적재 시점은 0(설계 §4.2: pickedUp 은 earnings 불변)
+    expect(r.fare ?? 0).toBe(0);
+  });
+
+  it('delivered 시 earnings += 해당 job.fare, 반환에 fare 동봉', () => {
+    const jobs = [fareJob(0, 100, 0, 200, 5000), fareJob(0, 200, 0, 300, 7000)];
+    let m = createMission(jobs);
+    m = stepMission(m, at(jobs[0].pickup)).state;        // 적재
+    const r = stepMission(m, at(jobs[0].dropoff));        // 하차
+    expect(r.event).toBe('delivered');
+    expect(r.fare).toBe(5000);
+    expect(r.state.earnings).toBe(5000);
+  });
+
+  it('allDone 시에도 마지막 job.fare 가산 + 반환 fare 동봉', () => {
+    const jobs = [fareJob(0, 100, 0, 200, 5000)];
+    let m = createMission(jobs);
+    m = stepMission(m, at(jobs[0].pickup)).state;
+    const r = stepMission(m, at(jobs[0].dropoff));
+    expect(r.event).toBe('allDone');
+    expect(r.fare).toBe(5000);
+    expect(r.state.earnings).toBe(5000);
+  });
+
+  it('전체 완료 후 earnings = 모든 job.fare 합', () => {
+    const jobs = [
+      fareJob(0, 100, 0, 200, 5000),
+      fareJob(0, 200, 0, 300, 7000),
+      fareJob(0, 300, 0, 400, 3000),
+    ];
+    let m = createMission(jobs);
+    for (let i = 0; i < jobs.length; i++) {
+      m = stepMission(m, at(jobs[i].pickup)).state;
+      m = stepMission(m, at(jobs[i].dropoff)).state;
+    }
+    expect(m.phase).toBe('done');
+    expect(m.earnings).toBe(5000 + 7000 + 3000);
+  });
+
+  it('fare 미정의(구 job)도 안전 — earnings += 0 (설계 §7 ?? 가드)', () => {
+    // mkJob 은 cargo/fare 없는 구 job. delivered 시 fare 없으면 0 가산.
+    const jobs = [mkJob(0, 100, 0, 200)];
+    let m = createMission(jobs);
+    m = stepMission(m, at(jobs[0].pickup)).state;
+    const r = stepMission(m, at(jobs[0].dropoff));
+    expect(r.event).toBe('allDone');
+    expect(r.state.earnings).toBe(0);     // fare 없음 → 0
+    expect(r.fare ?? 0).toBe(0);
+  });
+
+  it('불변성: earnings 가산도 새 객체(입력 state 미변형)', () => {
+    const jobs = [fareJob(0, 100, 0, 200, 5000)];
+    let m = createMission(jobs);
+    const afterPickup = stepMission(m, at(jobs[0].pickup)).state;
+    const before = afterPickup.earnings;
+    const r = stepMission(afterPickup, at(jobs[0].dropoff));
+    expect(afterPickup.earnings).toBe(before);   // 원본 state 의 earnings 불변
+    expect(r.state).not.toBe(afterPickup);
   });
 });

@@ -78,9 +78,13 @@ export function buildCar(carType = {}) {
 }
 
 // 화물 표시/숨김 토글 — mission.hasCargo 와 동기화.
-export function setCargo(car, visible) {
+//   color(선택, hex): 주어지면 화물 박스 색까지 갱신(M17 화물 종류색).
+//   2-인자 호출은 기존 동작 그대로(색 변경 없음, 회귀 0).
+export function setCargo(car, visible, color) {
   const cargo = car.getObjectByName('cargo');
-  if (cargo) cargo.visible = !!visible;
+  if (!cargo) return;
+  cargo.visible = !!visible;
+  if (color != null && cargo.material) cargo.material.color.setHex(color);
 }
 
 // 차량 정렬 — '천장' 축(up=지형 법선) 기준으로 heading 회전 ─────────

@@ -41,7 +41,13 @@ export function createHud(opts = {}) {
   document.body.appendChild(toast);
   let toastTimer = null;
 
-  // missionView = { phase, label, distance, hasCargo, completed, total }
+  // ₩ 천 단위 구분 — 운임/수익 표시용(순수).
+  function won(n) {
+    return '₩' + Math.round(n ?? 0).toLocaleString('ko-KR');
+  }
+
+  // missionView = { phase, label, distance, hasCargo, completed, total,
+  //                 cargoIcon, cargoLabel, fare, earnings, needStop }
   function update(vehicle, missionView) {
     // ── line1: 운전 피드백 (유지) ──
     const kmh = Math.abs(vehicle.speed) * 3.6;
@@ -56,11 +62,21 @@ export function createHud(opts = {}) {
     const mv = missionView ?? {};
     const cargo = mv.hasCargo ? '🟩 적재됨' : '⬜ 빈차';
     const done = `${mv.completed ?? 0}/${mv.total ?? 0}`;
+    // 누적 수익(항상 표기) — 없으면 빈 문자열(하위호환)
+    const earn = mv.earnings != null
+      ? ` &#160;|&#160; 누적 <b>${won(mv.earnings)}</b>`
+      : '';
     if (mv.phase === 'done') {
       line2.innerHTML =
-        `✅ 모든 배송 완료 &#160;|&#160; ${done}`;
+        `✅ 모든 배송 완료 &#160;|&#160; ${done}${earn}`;
     } else {
       const icon = mv.phase === 'toDropoff' ? '🏁 배송지로' : '📦 적재지로';
+      // 현재 화물(아이콘+라벨) — 없으면 빈 문자열
+      const cargoInfo = mv.cargoLabel
+        ? ` &#160;|&#160; ${mv.cargoIcon ?? '📦'} ${mv.cargoLabel}`
+        : '';
+      // 이번 운임 — 없으면 빈 문자열
+      const fareInfo = mv.fare != null ? ` &#160;|&#160; 운임 ${won(mv.fare)}` : '';
       // 목표 반경 안인데 아직 달리는 중이면 "정차하세요" 안내
       const stopHint = mv.needStop
         ? ' &#160;|&#160; <b style="color:#ffcc33">🛑 정차하세요</b>'
@@ -68,7 +84,7 @@ export function createHud(opts = {}) {
       line2.innerHTML =
         `${icon} <b>${mv.label ?? ''}</b> &#160;|&#160; ` +
         `${Math.round(mv.distance ?? 0)} m &#160;|&#160; ` +
-        `${cargo} &#160;|&#160; ${done}${stopHint}`;
+        `${cargo}${cargoInfo}${fareInfo} &#160;|&#160; ${done}${earn}${stopHint}`;
     }
   }
 
