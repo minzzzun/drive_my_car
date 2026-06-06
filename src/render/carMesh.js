@@ -1,39 +1,53 @@
 // ══════════════════════════════════════════════════════════════
 // render/carMesh.js — 차량 메시 (test1 섀시+캐빈+바퀴 구성 참조)
 // 그룹 원점 = 차량 중심. dyn(위치/heading/roll/pitch)으로 매 프레임 변환.
+// M13b: 차종 mesh 치수/색으로 외형 파라미터화. 인자 없으면 DEFAULT_MESH(=현행).
 // ══════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 
-export function buildCar(opts = {}) {
-  const bodyColor  = opts.bodyColor ?? 0xcc2222;
-  const cabinColor = opts.cabinColor ?? 0x2255cc;
-  const wheelColor = opts.wheelColor ?? 0x222222;
+// 현재 하드코딩 치수와 동일 — 인자 없이 buildCar() 호출 시 기존 외형 그대로(회귀 0).
+export const DEFAULT_MESH = {
+  bodyLen: 4.0, bodyWidth: 2.0, bodyHeight: 0.5,
+  cabinLen: 1.2, cabinWidth: 1.5, cabinHeight: 0.8, cabinOffsetZ: -0.3,
+  wheelRadius: 0.3, wheelWidth: 0.3, wheelBaseHalf: 1.3, trackHalf: 1.0,
+  eyeHeight: 1.2,
+  bodyColor: 0xcc2222, cabinColor: 0x2255cc, wheelColor: 0x222222,
+};
+
+// carType 은 mesh 객체(예: CAR_TYPES.truck.mesh) 또는 mesh 를 품은 차종 객체.
+export function buildCar(carType = {}) {
+  const m = { ...DEFAULT_MESH, ...(carType.mesh ?? carType) };
   const car = new THREE.Group();
 
-  // 섀시 (차 밑바닥) — 전진 +Z, 길이 4
+  // 섀시 (차 밑바닥) — 전진 +Z = 길이(bodyLen)
   const chassis = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 0.5, 4),
-    new THREE.MeshPhongMaterial({ color: bodyColor }),
+    new THREE.BoxGeometry(m.bodyWidth, m.bodyHeight, m.bodyLen),
+    new THREE.MeshPhongMaterial({ color: m.bodyColor }),
   );
-  chassis.position.y = 0.2;
+  chassis.name = 'chassis';
+  chassis.position.y = m.bodyHeight / 2 - 0.05;  // 바닥 살짝 띄움
   car.add(chassis);
 
-  // 캐빈 (운전석) — 뒤쪽에 얹음
+  // 캐빈 (운전석) — 섀시 위에 얹음
   const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.8, 1.2),
-    new THREE.MeshPhongMaterial({ color: cabinColor }),
+    new THREE.BoxGeometry(m.cabinWidth, m.cabinHeight, m.cabinLen),
+    new THREE.MeshPhongMaterial({ color: m.cabinColor }),
   );
-  cabin.position.set(0, 0.85, -0.3);
+  cabin.name = 'cabin';
+  cabin.position.set(0, m.bodyHeight + m.cabinHeight / 2 - 0.05, m.cabinOffsetZ);
   car.add(cabin);
 
-  // 바퀴 4개 (실린더, x축 정렬)
-  const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.3, 16);
-  const wheelMat = new THREE.MeshPhongMaterial({ color: wheelColor });
+  // 바퀴 4개 (실린더, x축 정렬) — Y 를 반경에 연동해 땅에 안 묻히게
+  const wheelGeo = new THREE.CylinderGeometry(m.wheelRadius, m.wheelRadius, m.wheelWidth, 16);
+  const wheelMat = new THREE.MeshPhongMaterial({ color: m.wheelColor });
+  const wy = m.wheelRadius - 0.35;  // 반경 0.3 → -0.05(현행), 클수록 위로
+  const wb = m.wheelBaseHalf;
+  const tr = m.trackHalf;
   const wheelPos = [
-    [-1, -0.05,  1.3], // 앞 좌
-    [ 1, -0.05,  1.3], // 앞 우
-    [-1, -0.05, -1.3], // 뒤 좌
-    [ 1, -0.05, -1.3], // 뒤 우
+    [-tr, wy,  wb], // 앞 좌
+    [ tr, wy,  wb], // 앞 우
+    [-tr, wy, -wb], // 뒤 좌
+    [ tr, wy, -wb], // 뒤 우
   ];
   for (const [x, y, z] of wheelPos) {
     const wheel = new THREE.Mesh(wheelGeo, wheelMat);

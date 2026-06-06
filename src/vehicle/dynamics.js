@@ -17,8 +17,10 @@ export const SAMPLE_SIDE    = 1.2;    // 좌/우 높이 샘플 거리
 function sign(x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
 
 // 종방향 속도 적분 ─────────────────────────────────────────────────
-export function integrateSpeed(speed, engineAccel, brake, dt) {
-  const a = engineAccel - ROLLING_RESIST * speed - brake * BRAKE_DECEL * sign(speed);
+// 차종 파라미터(car)는 옵션 객체로 받고, 기본값은 현 모듈 상수 → 인자 미지정 시 현행과 동일.
+export function integrateSpeed(speed, engineAccel, brake, dt,
+  { rollingResist = ROLLING_RESIST, brakeDecel = BRAKE_DECEL } = {}) {
+  const a = engineAccel - rollingResist * speed - brake * brakeDecel * sign(speed);
   let next = speed + a * dt;
   // 브레이크로 0을 가로지르면 정지 고정(부호 반전 방지)
   if (brake > 0 && sign(next) !== sign(speed) && speed !== 0) next = 0;
@@ -26,9 +28,10 @@ export function integrateSpeed(speed, engineAccel, brake, dt) {
 }
 
 // 요 레이트(조향) ─────────────────────────────────────────────────
-export function yawRate(steer, speed) {
-  const authority = Math.min(1, Math.abs(speed) / TURN_FULL_SPEED);
-  return steer * MAX_STEER_RATE * sign(speed) * authority;
+export function yawRate(steer, speed,
+  { maxSteerRate = MAX_STEER_RATE, turnFullSpeed = TURN_FULL_SPEED } = {}) {
+  const authority = Math.min(1, Math.abs(speed) / turnFullSpeed);
+  return steer * maxSteerRate * sign(speed) * authority;
 }
 
 // XZ 전진 ─────────────────────────────────────────────────────────
@@ -54,8 +57,8 @@ export function terrainTiltAt(x, z, heading, sampleHeight) {
 }
 
 // 코너링 동적 롤(조향 반대 방향으로 기움) ──────────────────────────
-export function corneringRoll(steer, speed) {
-  return -steer * Math.abs(speed) * CORNER_ROLL_K;
+export function corneringRoll(steer, speed, { cornerRollK = CORNER_ROLL_K } = {}) {
+  return -steer * Math.abs(speed) * cornerRollK;
 }
 
 // 지형 법선 (차체 '천장' 방향) — 중심 차분으로 근사 ────────────────
@@ -85,16 +88,17 @@ export function createDynState(spawn = {}) {
   };
 }
 
-export function stepDynamics(state, inputs, dt, sampleHeight) {
+// car = 차종 perf 묶음(옵션). 미지정 시 각 적분 함수의 기본값(= 현 모듈 상수)이 적용된다.
+export function stepDynamics(state, inputs, dt, sampleHeight, car = {}) {
   const { engineAccel, brake, steer } = inputs;
-  const speed   = integrateSpeed(state.speed, engineAccel, brake, dt);
+  const speed   = integrateSpeed(state.speed, engineAccel, brake, dt, car);
   // 1인칭 화면 기준 조향: 화면 오른쪽 = 월드 -X 이므로 heading 적분 부호를 음수로
-  const heading = state.heading - yawRate(steer, speed) * dt;
+  const heading = state.heading - yawRate(steer, speed, car) * dt;
   const p       = advance(state, heading, speed, dt);
   const y       = sampleHeight(p.x, p.z) + RIDE_HEIGHT;
 
   const tilt = terrainTiltAt(p.x, p.z, heading, sampleHeight);
-  const roll = tilt.roll + corneringRoll(steer, speed);
+  const roll = tilt.roll + corneringRoll(steer, speed, car);
   const pitch = tilt.pitch;
 
   return {

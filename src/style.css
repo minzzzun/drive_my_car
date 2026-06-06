@@ -17,12 +17,12 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
 #overlay-msg h2 { font-size: 30px; margin-bottom: 14px; }
 #overlay-msg  p { font-size: 16px; margin-bottom: 18px; opacity: 0.8; }
 
-/* ── 맵 선택 카드 ─────────────────────────────────────────── */
-#map-select {
+/* ── 차종/맵 선택 카드 (동형 레이아웃) ────────────────────── */
+#car-select, #map-select {
   display: flex; gap: 16px; justify-content: center;
   margin-bottom: 18px;
 }
-.map-card {
+.car-card, .map-card {
   background: rgba(255, 255, 255, 0.08);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
@@ -30,13 +30,13 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s, transform 0.12s;
 }
-.map-card:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-2px); }
-.map-card.selected {
+.car-card:hover, .map-card:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-2px); }
+.car-card.selected, .map-card.selected {
   border-color: #00ff88; color: #00ff88;
   background: rgba(0, 255, 136, 0.1);
 }
-.map-card-icon  { font-size: 34px; line-height: 1; margin-bottom: 6px; }
-.map-card-label { font-size: 14px; font-weight: bold; }
+.car-card-icon,  .map-card-icon  { font-size: 34px; line-height: 1; margin-bottom: 6px; }
+.car-card-label, .map-card-label { font-size: 14px; font-weight: bold; }
 
 .controls-hint {
   font-size: 13px;

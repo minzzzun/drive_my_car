@@ -6,22 +6,39 @@ import { createEngineState, startEngine, stepEngine, MAX_RPM } from './engine.js
 import {
   shiftUp, shiftDown, totalRatio, engineRpmFromSpeed, speedFromEngineRpm, gearName,
 } from './gearbox.js';
-import { createDynState, stepDynamics } from './dynamics.js';
+import {
+  createDynState, stepDynamics,
+  ROLLING_RESIST, BRAKE_DECEL, MAX_STEER_RATE, TURN_FULL_SPEED, CORNER_ROLL_K,
+} from './dynamics.js';
 
 // 구동력(토크감) 기준. 저단일수록 토크가 커 가속이 빠르다.
 export const ACCEL_BASE = 9;   // 풀스로틀·완전결합 기준 구동 가속(m/s²)
 export const CLUTCH_SHIFT_MAX = 0.2;  // 변속 허용: 클러치 결합도 이 이하(=충분히 밟음)일 때만
 
-export function createVehicle(spawn = {}) {
+// 차종 미지정 시 사용하는 현행 상수 묶음(회귀 0의 핵심). perf 7키를 현 모듈 상수로 구성.
+export const LEGACY_CAR = {
+  accelBase: ACCEL_BASE,
+  gearTopFactor: 1,
+  rollingResist: ROLLING_RESIST,
+  brakeDecel: BRAKE_DECEL,
+  maxSteerRate: MAX_STEER_RATE,
+  turnFullSpeed: TURN_FULL_SPEED,
+  cornerRollK: CORNER_ROLL_K,
+};
+
+// carParams 미지정 시 LEGACY_CAR(현 상수) → 인자 없이 호출하면 현행과 동일하게 동작.
+export function createVehicle(spawn = {}, carParams = LEGACY_CAR) {
   return {
     engine: createEngineState(),
     gear: 0,
     dyn: createDynState(spawn),
+    car: carParams,
   };
 }
 
 // controls = {throttle, brake, clutchPedal, steer, shift(+1/-1/0), ignition}
 export function stepVehicle(v, controls, dt, sampleHeight) {
+  const car = v.car ?? LEGACY_CAR;  // 구(舊) 상태 객체(car 없음) 호환
   const { throttle, brake, clutchPedal, steer, shift, ignition } = controls;
   const engagement = 1 - clutchPedal;  // 1=완전 결합(페달 뗌), 0=완전 분리(클러치 밟음)
 
@@ -57,19 +74,20 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
   let engineAccel = 0;
   if (eng.on && inGear && engagement > 0) {
     const dir = gear < 0 ? -1 : 1;
-    const maxSpeed = Math.abs(speedFromEngineRpm(MAX_RPM, gear)); // 이 기어 최고속
-    const torque   = ACCEL_BASE * (totalRatio(gear) / totalRatio(3)); // 저단일수록 큼
+    const maxSpeed = Math.abs(speedFromEngineRpm(MAX_RPM, gear)) * car.gearTopFactor; // 이 기어 최고속(차종 배율)
+    const torque   = car.accelBase * (totalRatio(gear) / totalRatio(3)); // 저단일수록 큼
     const headroom = Math.max(0, 1 - Math.abs(v.dyn.speed) / maxSpeed); // 최고속 근처서 0
     engineAccel = dir * effThrottle * torque * engagement * headroom;
   }
 
   // 동역학 스텝 ─────────────────────────────────────────────────
-  const dyn = stepDynamics(v.dyn, { engineAccel, brake: effBrake, steer }, dt, sampleHeight);
+  const dyn = stepDynamics(v.dyn, { engineAccel, brake: effBrake, steer }, dt, sampleHeight, car);
 
   return {
     engine: { rpm: eng.rpm, on: eng.on, stalled: eng.stalled },
     gear,
     dyn,
+    car,  // 차종 파라미터를 상태에 계속 보존
     // 파생 상태(HUD/채점용)
     rpm: eng.rpm,
     on: eng.on,

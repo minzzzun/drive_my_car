@@ -10,11 +10,12 @@ import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.
 import { MAX_RPM } from './vehicle/engine.js';
 import { createAudio } from './render/audio.js';
 import { getMap } from './maps/index.js';
+import { getCarType, DEFAULT_CAR_ID } from './vehicle/carTypes.js';
 
 // ══════════════════════════════════════════════════════════════
 // 상수
 // ══════════════════════════════════════════════════════════════
-const EYE_HEIGHT = 1.2;  // 운전석 눈높이 (차량 원점 위)
+let EYE_HEIGHT = 1.2;  // 운전석 눈높이 (차량 원점 위) — 선택 차종에 따라 변경
 
 // ══════════════════════════════════════════════════════════════
 // Three.js 초기화
@@ -57,12 +58,24 @@ mapCards.forEach(function(card) {
   });
 });
 
+// 시작 화면 차종 선택 (기본 sedan). 카드 클릭으로 변경.
+let selectedCarId = DEFAULT_CAR_ID;
+const carCards = overlay.querySelectorAll('.car-card');
+carCards.forEach(function(card) {
+  card.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (started) return;  // 게임 시작 후엔 차종 변경 불가(새로고침 필요)
+    selectedCarId = card.dataset.car;
+    carCards.forEach(function(c) { c.classList.toggle('selected', c === card); });
+  });
+});
+
 // 사운드 시스템 (엔진음 + 변속음). AudioContext는 사용자 제스처(오버레이 click)에서 생성.
 const audio = createAudio({ maxRpm: MAX_RPM });
 
 // 오버레이 클릭 → 시작 또는 (일시정지에서) 재개
 overlay.addEventListener('click', function() {
-  if (!started) startGame(selectedMapId);  // 최초 클릭에서 선택한 맵으로 초기화
+  if (!started) startGame(selectedMapId, selectedCarId);  // 최초 클릭에서 선택한 맵/차종으로 초기화
   started = true;
   paused = false;
   overlay.style.display = 'none';
@@ -96,10 +109,9 @@ document.addEventListener('pointerlockchange', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
-// 차량 메시 (1인칭 주행) — 위치/스폰은 startGame 에서 설정
+// 차량 메시 (1인칭 주행) — 차종에 맞춰 startGame 에서 (재)생성
 // ══════════════════════════════════════════════════════════════
-const car = buildCar();
-scene.add(car);
+let car = null;
 
 // 채점 엣지 감지용 이전값
 let prevOnRoad = true;
@@ -227,8 +239,17 @@ window.addEventListener('resize', function() {
 // ══════════════════════════════════════════════════════════════
 let lastCX = Infinity, lastCZ = Infinity;
 
-function startGame(mapId = 'natural') {
+function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   map = getMap(mapId);
+
+  // 차종 선택 → 성능치/외형/눈높이 반영
+  const carType = getCarType(carId);
+  EYE_HEIGHT = carType.mesh.eyeHeight ?? 1.2;
+
+  // 차량 메시를 차종에 맞춰 (재)생성 — 재시작 대비 기존 메시 제거
+  if (car) scene.remove(car);
+  car = buildCar(carType.mesh);
+  scene.add(car);
 
   // 코스/목표·정적 씬(코스 메시·조명·배경·포그) 구성
   checkpoints = map.getGoals();
@@ -236,7 +257,7 @@ function startGame(mapId = 'natural') {
 
   // 스폰(위치+heading+y) — 차량/카메라 배치
   const spawn = map.getSpawn();
-  vehicle = createVehicle({ x: spawn.x, z: spawn.z, y: spawn.y, heading: spawn.heading });
+  vehicle = createVehicle({ x: spawn.x, z: spawn.z, y: spawn.y, heading: spawn.heading }, carType.perf);
   prevGear = vehicle.gear;
 
   // 채점 상태

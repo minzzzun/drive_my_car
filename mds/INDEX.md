@@ -14,6 +14,7 @@
 - [reverse-controls.md](design/reverse-controls.md) — 후진(R) 기어에서 W/S(throttle/brake) 반전 설계.
 - [audio.md](design/audio.md) — 사운드 시스템(엔진 샘플 루프+RPM playbackRate, 변속음 샘플/클릭 폴백) 설계.
 - [maps.md](design/maps.md) — 맵 추상화 인터페이스 + 도시 맵(격자 도로·박스 건물) 설계. M12a/b/c 분할.
+- [cartypes.md](design/cartypes.md) — 차종 선택(승용차/트럭) 성능·외형 파라미터 주입 설계.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
 - [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
@@ -33,6 +34,7 @@
 - [m11-audio.md](done/m11-audio.md) — M11 사운드(엔진 샘플 루프+변속음), audio 테스트 23건(전체 151 그린).
 - [m12a-map-abstraction.md](done/m12a-map-abstraction.md) — M12a 맵 추상화+naturalMap 래퍼(회귀 0), maps 테스트 16건(전체 167 그린).
 - [m12bc-city-map.md](done/m12bc-city-map.md) — M12b/c 도시 맵(격자·다색 건물·충돌)+맵 선택 UI, city 테스트(전체 202 그린).
+- [m13-cartypes.md](done/m13-cartypes.md) — M13 차종 선택(승용차/트럭) 성능·외형·UI, carTypes/carMesh 테스트(전체 231 그린).
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -52,3 +54,4 @@
 | M11 | 사운드(엔진음+변속음+음소거) | ✅ 완료 | [done/m11-audio.md](done/m11-audio.md) |
 | M12a | 맵 추상화 + naturalMap 래퍼 | ✅ 완료 | [done/m12a-map-abstraction.md](done/m12a-map-abstraction.md) |
 | M12b/c | 도시 맵(격자·건물·충돌) + 맵 선택 UI | ✅ 완료 | [done/m12bc-city-map.md](done/m12bc-city-map.md) |
+| M13 | 차종 선택(승용차/트럭) | ✅ 완료 | [done/m13-cartypes.md](done/m13-cartypes.md) |

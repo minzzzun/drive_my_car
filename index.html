@@ -11,7 +11,17 @@
   <div id="overlay">
     <div id="overlay-msg">
       <h2>🚗 1종 수동 운전 시험</h2>
-      <p>맵을 선택하고 클릭하여 시작하세요</p>
+      <p>차종과 맵을 선택하고 클릭하여 시작하세요</p>
+      <div id="car-select">
+        <div class="car-card selected" data-car="sedan">
+          <div class="car-card-icon">🚗</div>
+          <div class="car-card-label">승용차</div>
+        </div>
+        <div class="car-card" data-car="truck">
+          <div class="car-card-icon">🚚</div>
+          <div class="car-card-label">트럭</div>
+        </div>
+      </div>
       <div id="map-select">
         <div class="map-card selected" data-map="natural">
           <div class="map-card-icon">🌄</div>
