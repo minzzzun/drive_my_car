@@ -29,9 +29,14 @@ export function worldToMinimap(wx, wz, view) {
   };
 }
 
-// 캔버스 미니맵 생성 ──────────────────────────────────────────────
-export function createMinimap(road, checkpoints, opts = {}) {
+// 캔버스 미니맵 생성 (통일 데이터 포맷 소비) ──────────────────────
+//   data = { polylines:[[{x,z}...]], goals:[{x,z}], bounds }
+//   bounds 가 null 이면 polylines 의 모든 점으로부터 계산.
+export function createMinimap(data, opts = {}) {
   const size = opts.size ?? 160;
+  const polylines = data.polylines ?? [];
+  const goals = data.goals ?? [];
+
   const canvas = document.createElement('canvas');
   canvas.id = 'minimap';
   canvas.width = size;
@@ -41,23 +46,29 @@ export function createMinimap(road, checkpoints, opts = {}) {
     'border:2px solid rgba(255,255,255,0.6);border-radius:8px;' +
     'background:rgba(20,30,40,0.65);z-index:30';
   const ctx = canvas.getContext('2d');
-  const view = { bounds: computeBounds(road.waypoints, 20), size };
+
+  // 경계: data.bounds 우선, 없으면 폴리라인 점들로 계산
+  const allPts = polylines.flat();
+  const bounds = data.bounds ?? computeBounds(allPts, 20);
+  const view = { bounds, size };
 
   function draw(dyn, score) {
     ctx.clearRect(0, 0, size, size);
 
-    // 도로 폴리라인
+    // 도로/격자 폴리라인
     ctx.strokeStyle = '#cfcfcf';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    road.waypoints.forEach((w, i) => {
-      const p = worldToMinimap(w.x, w.z, view);
-      if (i === 0) ctx.moveTo(p.mx, p.my); else ctx.lineTo(p.mx, p.my);
-    });
-    ctx.stroke();
+    for (const line of polylines) {
+      ctx.beginPath();
+      line.forEach((w, i) => {
+        const p = worldToMinimap(w.x, w.z, view);
+        if (i === 0) ctx.moveTo(p.mx, p.my); else ctx.lineTo(p.mx, p.my);
+      });
+      ctx.stroke();
+    }
 
-    // 체크포인트 (현재 목표 강조)
-    checkpoints.forEach((cp, i) => {
+    // 목표 지점 (현재 목표 강조)
+    goals.forEach((cp, i) => {
       const p = worldToMinimap(cp.x, cp.z, view);
       const current = score && i === score.nextCheckpoint;
       ctx.fillStyle = current ? '#ffcc00' : (score && i < score.nextCheckpoint ? '#55aa55' : '#ff8800');

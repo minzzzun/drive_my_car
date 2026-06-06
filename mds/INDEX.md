@@ -13,6 +13,7 @@
 - [input.md](design/input.md) — input.js 키 매핑 + 1인칭 운전석 카메라 결선 설계.
 - [reverse-controls.md](design/reverse-controls.md) — 후진(R) 기어에서 W/S(throttle/brake) 반전 설계.
 - [audio.md](design/audio.md) — 사운드 시스템(엔진 샘플 루프+RPM playbackRate, 변속음 샘플/클릭 폴백) 설계.
+- [maps.md](design/maps.md) — 맵 추상화 인터페이스 + 도시 맵(격자 도로·박스 건물) 설계. M12a/b/c 분할.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
 - [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
@@ -30,6 +31,7 @@
 - [m9-acceptance.md](done/m9-acceptance.md) — M9 마감: README + ACCEPTANCE_CRITERIA 대조 검증(전 항목 충족).
 - [m10-reverse-controls.md](done/m10-reverse-controls.md) — M10 후진(R) 기어 W/S 반전, 단위 테스트 6건(전체 128 그린).
 - [m11-audio.md](done/m11-audio.md) — M11 사운드(엔진 샘플 루프+변속음), audio 테스트 23건(전체 151 그린).
+- [m12a-map-abstraction.md](done/m12a-map-abstraction.md) — M12a 맵 추상화+naturalMap 래퍼(회귀 0), maps 테스트 16건(전체 167 그린).
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -47,3 +49,4 @@
 | M9 | 마감 + 검증 | ✅ 완료 | [done/m9-acceptance.md](done/m9-acceptance.md) |
 | M10 | 후진(R) 기어 W/S 입력 반전 | ✅ 완료 | [done/m10-reverse-controls.md](done/m10-reverse-controls.md) |
 | M11 | 사운드(엔진음+변속음+음소거) | ✅ 완료 | [done/m11-audio.md](done/m11-audio.md) |
+| M12a | 맵 추상화 + naturalMap 래퍼 | ✅ 완료 | [done/m12a-map-abstraction.md](done/m12a-map-abstraction.md) |

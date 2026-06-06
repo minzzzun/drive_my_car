@@ -1,13 +1,6 @@
 import * as THREE from 'three';
-import {
-  CHUNK_SIZE, RENDER_DIST, SEG_L0, SEG_L1, SEG_L2, SEG_L3,
-  terrainHeight, quantizeHeight, getSeg, heightToColorHex,
-} from './terrain.js';
-import {
-  DEFAULT_CHECKPOINTS, generateCourseWaypoints, createRoad, placeCheckpoints, isOnRoad,
-} from './road.js';
+import { CHUNK_SIZE } from './terrain.js';
 import { createScore, stepScore, CHECKPOINT_TIME } from './scoring.js';
-import { buildCourse } from './render/road.js';
 import { buildCar, updateCarTransform } from './render/carMesh.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud } from './render/hud.js';
@@ -15,46 +8,13 @@ import { createGearstick } from './render/gearstick.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.js';
 import { MAX_RPM } from './vehicle/engine.js';
-import { terrainNormal } from './vehicle/dynamics.js';
 import { createAudio } from './render/audio.js';
+import { getMap } from './maps/index.js';
 
 // ══════════════════════════════════════════════════════════════
-// 상수 (지형 상수·함수는 terrain.js 에서 import)
+// 상수
 // ══════════════════════════════════════════════════════════════
 const EYE_HEIGHT = 1.2;  // 운전석 눈높이 (차량 원점 위)
-
-// ══════════════════════════════════════════════════════════════
-// 청크 생성 — PlaneGeometry + 계단형 높이 양자화
-// ══════════════════════════════════════════════════════════════
-const _chunkColor = new THREE.Color();   // 색상 변환용 임시 객체
-
-function createChunk(cx, cz, seg) {
-  const geo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, seg, seg);
-  geo.rotateX(-Math.PI / 2);
-
-  const pos    = geo.attributes.position.array;
-  const colors = new Float32Array(pos.length);
-
-  for (let i = 0; i < pos.length; i += 3) {
-    const wx  = cx * CHUNK_SIZE + pos[i];
-    const wz  = cz * CHUNK_SIZE + pos[i + 2];
-    const raw = terrainHeight(wx, wz);
-    // ★ 핵심: 높이를 step 단위로 반올림 → 계단형 사각 지형
-    const h   = quantizeHeight(raw, seg);
-    pos[i + 1] = h;
-    _chunkColor.setHex(heightToColorHex(h));
-    colors[i] = _chunkColor.r; colors[i + 1] = _chunkColor.g; colors[i + 2] = _chunkColor.b;
-  }
-
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.attributes.position.needsUpdate = true;
-  geo.computeVertexNormals();
-
-  const mat  = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 8 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
-  return { mesh, mat, seg };
-}
 
 // ══════════════════════════════════════════════════════════════
 // Three.js 초기화
@@ -65,25 +25,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.FogExp2(0x87ceeb, 0.010);
-
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 700);
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-const sunLight = new THREE.DirectionalLight(0xfffde7, 1.3);
-sunLight.position.set(300, 500, 200);
-scene.add(sunLight);
-scene.add(new THREE.HemisphereLight(0x87ceeb, 0x3d6b3d, 0.45));
-
 // ══════════════════════════════════════════════════════════════
-// 코스(도로 + 체크포인트) 생성
+// 게임 상태 (startGame 에서 맵 선택 후 채워짐)
 // ══════════════════════════════════════════════════════════════
-const courseWaypoints = generateCourseWaypoints({ count: 24, start: { x: 0, z: 0 } });
-const road            = createRoad(courseWaypoints);
-const checkpoints     = placeCheckpoints(road, DEFAULT_CHECKPOINTS);
-const { group: courseGroup } = buildCourse(road, checkpoints);
-scene.add(courseGroup);
+let map        = null;   // 현재 맵 (인터페이스 객체)
+let checkpoints = [];     // 채점/체크포인트 목표
+let vehicle    = null;
+let score      = null;
+let minimap    = null;
 
 // ══════════════════════════════════════════════════════════════
 // 입력 + 시작 오버레이 (포인터 락은 커서 숨김 용도)
@@ -98,6 +49,7 @@ const audio = createAudio({ maxRpm: MAX_RPM });
 
 // 오버레이 클릭 → 시작 또는 (일시정지에서) 재개
 overlay.addEventListener('click', function() {
+  if (!started) startGame('natural');  // 최초 클릭에서 맵 초기화 (M12c 전: natural 고정)
   started = true;
   paused = false;
   overlay.style.display = 'none';
@@ -107,7 +59,7 @@ overlay.addEventListener('click', function() {
 
 // 주행 중 일시정지 → 오버레이(설정창) 표시 + 포인터 락 해제
 function pauseGame() {
-  if (!started || paused || score.state !== 'driving') return;
+  if (!started || paused || !score || score.state !== 'driving') return;
   paused = true;
   overlay.style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock?.();
@@ -131,73 +83,12 @@ document.addEventListener('pointerlockchange', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
-// 세계 관리 (청크 스트리밍)
+// 차량 메시 (1인칭 주행) — 위치/스폰은 startGame 에서 설정
 // ══════════════════════════════════════════════════════════════
-const loadedChunks = new Map();
-
-function disposeChunk(chunk) {
-  chunk.mesh.geometry.dispose();
-  chunk.mat.dispose();
-}
-
-function updateWorld(px, pz) {
-  const pcx = Math.floor(px / CHUNK_SIZE);
-  const pcz = Math.floor(pz / CHUNK_SIZE);
-
-  for (let dx = -RENDER_DIST; dx <= RENDER_DIST; dx++) {
-    for (let dz = -RENDER_DIST; dz <= RENDER_DIST; dz++) {
-      const cx  = pcx + dx, cz = pcz + dz;
-      const key = `${cx},${cz}`;
-      const seg = getSeg(cx, cz, pcx, pcz);
-      const ex  = loadedChunks.get(key);
-
-      if (!ex) {
-        const chunk = createChunk(cx, cz, seg);
-        chunk.polyCount = Math.floor(chunk.mesh.geometry.index.count / 3);
-        scene.add(chunk.mesh);
-        loadedChunks.set(key, chunk);
-      } else if (ex.seg !== seg) {
-        scene.remove(ex.mesh);
-        disposeChunk(ex);
-        const chunk = createChunk(cx, cz, seg);
-        chunk.polyCount = Math.floor(chunk.mesh.geometry.index.count / 3);
-        scene.add(chunk.mesh);
-        loadedChunks.set(key, chunk);
-      }
-    }
-  }
-
-  const toDelete = [];
-  for (const [key, chunk] of loadedChunks) {
-    const [cx, cz] = key.split(',').map(Number);
-    if (Math.abs(cx - pcx) > RENDER_DIST + 1 || Math.abs(cz - pcz) > RENDER_DIST + 1) {
-      scene.remove(chunk.mesh);
-      disposeChunk(chunk);
-      toDelete.push(key);
-    }
-  }
-  toDelete.forEach(function(k) { loadedChunks.delete(k); });
-}
-
-// ══════════════════════════════════════════════════════════════
-// 차량 (1인칭 주행)
-// ══════════════════════════════════════════════════════════════
-const _spawn = road.waypoints[0];
-const _next  = road.waypoints[1] ?? { x: _spawn.x, z: _spawn.z + 1 };
-const spawnHeading = Math.atan2(_next.x - _spawn.x, _next.z - _spawn.z);
-let vehicle = createVehicle({
-  x: _spawn.x,
-  z: _spawn.z,
-  y: terrainHeight(_spawn.x, _spawn.z),
-  heading: spawnHeading,
-});
-
-// 차량 메시
 const car = buildCar();
 scene.add(car);
 
-// 채점 상태 + 엣지 감지용 이전값
-let score = createScore({ totalCheckpoints: checkpoints.length, timeLimit: CHECKPOINT_TIME });
+// 채점 엣지 감지용 이전값
 let prevOnRoad = true;
 let prevCollide = false;
 
@@ -211,12 +102,12 @@ const SCORING_ENABLED = false;
 let cameraMode = 'first';
 
 let clutchIn = false;  // 기어봉 UI 표시용 (클러치 충분히 밟힘)
-let prevGear = vehicle.gear;  // 변속 감지용(초기 0=N) — 시작 직후 의도치 않은 변속음 방지
+let prevGear = 0;  // 변속 감지용(초기 0=N) — 시작 직후 의도치 않은 변속음 방지
 
 function updateVehicle(dt) {
   const controls = readControls(input);
   clutchIn = (1 - controls.clutchPedal) <= CLUTCH_SHIFT_MAX;
-  vehicle = stepVehicle(vehicle, controls, dt, terrainHeight);
+  vehicle = stepVehicle(vehicle, controls, dt, map.heightAt);
   const d = vehicle.dyn;
 
   // ── 사운드: 엔진음(매 프레임) + 변속음(기어 변화 순간 1회) ──────
@@ -228,7 +119,7 @@ function updateVehicle(dt) {
 
   // ── 채점 엣지 이벤트 감지 (테스트용으로 임시 비활성 가능) ──────
   if (SCORING_ENABLED) {
-    const onRoad  = isOnRoad(road, d.x, d.z);
+    const onRoad  = map.isOnRoad(d.x, d.z);
     const tilt    = Math.max(Math.abs(d.roll), Math.abs(d.pitch));
     const collide = tilt > COLLISION_TILT && !vehicle.rollover && Math.abs(vehicle.speed) > 2;
     const target  = checkpoints[score.nextCheckpoint];
@@ -248,7 +139,7 @@ function updateVehicle(dt) {
   }
 
   // 차체 '천장' 방향(지형 법선) — 차량 정렬·카메라 up·조향축 기준
-  const n = terrainNormal(d.x, d.z, terrainHeight);
+  const n = map.normalAt(d.x, d.z);
   updateCarTransform(car, d, n);
 
   // 카메라 (1인칭 / 3인칭) — up을 차체 천장(법선)에 맞춰 차와 함께 기운다
@@ -269,10 +160,9 @@ function updateVehicle(dt) {
 // HUD + 미니맵 + 결과 오버레이
 // ══════════════════════════════════════════════════════════════
 const hud       = createHud();
-const minimap   = createMinimap(road, checkpoints);
 const gearstick = createGearstick();
-document.body.appendChild(minimap.canvas);
 document.body.appendChild(gearstick.canvas);
+// minimap 은 맵 데이터에 의존하므로 startGame 에서 생성/부착
 
 const result = document.createElement('div');
 result.id = 'result';
@@ -283,6 +173,7 @@ result.style.cssText =
 document.body.appendChild(result);
 
 function updateHUD() {
+  if (!vehicle) return;  // startGame 전엔 그릴 대상이 없음
   hud.update(vehicle, score);
   minimap.draw(vehicle.dyn, score);
   gearstick.draw(vehicle.gear, clutchIn);
@@ -307,25 +198,54 @@ window.addEventListener('resize', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
-// 초기화 + 루프
+// 게임 초기화 (맵 선택 → 코스/스폰/세계/미니맵 구성)
 // ══════════════════════════════════════════════════════════════
-updateWorld(_spawn.x, _spawn.z);
-camera.position.set(_spawn.x, terrainHeight(_spawn.x, _spawn.z) + EYE_HEIGHT, _spawn.z);
-
-const clock = new THREE.Clock();
 let lastCX = Infinity, lastCZ = Infinity;
+
+function startGame(mapId = 'natural') {
+  map = getMap(mapId);
+
+  // 코스/목표·정적 씬(코스 메시·조명·배경·포그) 구성
+  checkpoints = map.getGoals();
+  map.buildStatic(scene);
+
+  // 스폰(위치+heading+y) — 차량/카메라 배치
+  const spawn = map.getSpawn();
+  vehicle = createVehicle({ x: spawn.x, z: spawn.z, y: spawn.y, heading: spawn.heading });
+  prevGear = vehicle.gear;
+
+  // 채점 상태
+  score = createScore({ totalCheckpoints: checkpoints.length, timeLimit: CHECKPOINT_TIME });
+
+  // 미니맵(통일 데이터 소비) 생성/부착
+  minimap = createMinimap(map.getMinimapData());
+  document.body.appendChild(minimap.canvas);
+
+  // 초기 세계 스트리밍 + 카메라 위치
+  map.updateWorld(spawn.x, spawn.z, scene);
+  camera.position.set(spawn.x, spawn.y + EYE_HEIGHT, spawn.z);
+  lastCX = Math.floor(spawn.x / CHUNK_SIZE);
+  lastCZ = Math.floor(spawn.z / CHUNK_SIZE);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 렌더 루프
+// ══════════════════════════════════════════════════════════════
+const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (started && !paused && score.state === 'driving') updateVehicle(dt);
+  if (started && !paused && score && score.state === 'driving') updateVehicle(dt);
 
-  const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
-  const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
-  if (pcx !== lastCX || pcz !== lastCZ) {
-    updateWorld(camera.position.x, camera.position.z);
-    lastCX = pcx; lastCZ = pcz;
+  if (map) {
+    const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
+    const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
+    if (pcx !== lastCX || pcz !== lastCZ) {
+      map.updateWorld(camera.position.x, camera.position.z, scene);
+      lastCX = pcx; lastCZ = pcz;
+    }
   }
 
   updateHUD();
