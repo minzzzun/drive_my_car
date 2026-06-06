@@ -35,6 +35,12 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
 
   const inGear = gear !== 0;
 
+  // 후진 기어에서는 W/S(throttle/brake) 의미를 뒤집는다.
+  // gear === -1 → 악셀(S)로 후진 구동, 브레이크(W)로 감속.
+  const reverse = gear === -1;
+  const effThrottle = reverse ? brake : throttle;
+  const effBrake    = reverse ? throttle : brake;
+
   // 시동 ────────────────────────────────────────────────────────
   let engineState = v.engine;
   if (ignition && !engineState.on) {
@@ -43,7 +49,7 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
 
   // 엔진 스텝 (바퀴 결합 RPM) ───────────────────────────────────
   const coupledRpm = engineRpmFromSpeed(v.dyn.speed, gear);
-  const eng = stepEngine(engineState, { throttle, clutchEngagement: engagement, coupledRpm, inGear }, dt);
+  const eng = stepEngine(engineState, { throttle: effThrottle, clutchEngagement: engagement, coupledRpm, inGear }, dt);
 
   // 구동 가속 ───────────────────────────────────────────────────
   // 기어별 최고속(레드라인×기어비)을 한계로, 그 근처에서 가속이 줄어든다.
@@ -54,11 +60,11 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
     const maxSpeed = Math.abs(speedFromEngineRpm(MAX_RPM, gear)); // 이 기어 최고속
     const torque   = ACCEL_BASE * (totalRatio(gear) / totalRatio(3)); // 저단일수록 큼
     const headroom = Math.max(0, 1 - Math.abs(v.dyn.speed) / maxSpeed); // 최고속 근처서 0
-    engineAccel = dir * throttle * torque * engagement * headroom;
+    engineAccel = dir * effThrottle * torque * engagement * headroom;
   }
 
   // 동역학 스텝 ─────────────────────────────────────────────────
-  const dyn = stepDynamics(v.dyn, { engineAccel, brake, steer }, dt, sampleHeight);
+  const dyn = stepDynamics(v.dyn, { engineAccel, brake: effBrake, steer }, dt, sampleHeight);
 
   return {
     engine: { rpm: eng.rpm, on: eng.on, stalled: eng.stalled },

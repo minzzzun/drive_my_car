@@ -80,3 +80,95 @@ describe('전복', () => {
     expect(v.rollover).toBe(true);
   });
 });
+
+// ──────────────────────────────────────────────────────────────
+// M10 — 후진(R) 기어 W/S 입력 반전
+// 후진에서는 S=악셀(후진 구동), W=브레이크(감속).
+// 전진(1~5)·중립(N)은 현행 동작 유지(회귀).
+// ──────────────────────────────────────────────────────────────
+
+// 시동 켜고 R 기어(N→R)로 만든 차량 반환
+function reverseEngaged() {
+  let v = createVehicle();
+  v = stepVehicle(v, { ...NEUTRAL, ignition: true }, 0.05, flat);          // 시동
+  v = stepVehicle(v, { ...NEUTRAL, clutchPedal: 1, shift: -1 }, 0.05, flat); // N→R
+  return v;
+}
+
+// 시동 켜고 1단(N→1)으로 만든 차량 반환
+function firstGearEngaged() {
+  let v = createVehicle();
+  v = stepVehicle(v, { ...NEUTRAL, ignition: true }, 0.05, flat);          // 시동
+  v = stepVehicle(v, { ...NEUTRAL, clutchPedal: 1, shift: 1 }, 0.05, flat); // N→1
+  return v;
+}
+
+describe('후진 W/S 반전 (M10)', () => {
+  it('R + S = 후진 가속 (speed < 0)', () => {
+    let v = reverseEngaged();
+    expect(v.gearName).toBe('R');
+    for (let i = 0; i < 30; i++) {
+      v = stepVehicle(v, { throttle: 0, brake: 1, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(v.on).toBe(true);
+    expect(v.speed).toBeLessThan(0); // 후진 = 음수 속도
+  });
+
+  it('R + W = 감속/정지 (후진 중 절댓값 감소, 0 근처 수렴)', () => {
+    let v = reverseEngaged();
+    // 먼저 R+S로 후진시켜 speed<0 만든다
+    for (let i = 0; i < 30; i++) {
+      v = stepVehicle(v, { throttle: 0, brake: 1, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    const reverseSpeed = v.speed;
+    expect(reverseSpeed).toBeLessThan(0);
+
+    // 이제 R+W(브레이크)로 0을 향해 감속
+    for (let i = 0; i < 30; i++) {
+      v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(v.speed).toBeGreaterThan(reverseSpeed); // 절댓값 감소(음수가 0쪽으로)
+    expect(Math.abs(v.speed)).toBeLessThan(Math.abs(reverseSpeed));
+    expect(v.speed).toBeLessThanOrEqual(0);   // 전진으로 넘어가지 않음
+    expect(v.speed).toBeGreaterThan(-0.5);    // 0 근처 수렴
+  });
+
+  it('R + W 단독(정지에서)은 전진하지 않는다 (speed 0 유지)', () => {
+    let v = reverseEngaged();
+    expect(v.speed).toBe(0);
+    for (let i = 0; i < 30; i++) {
+      v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(v.speed).toBeLessThanOrEqual(0); // 양수(전진)가 되면 안 됨
+    expect(Math.abs(v.speed)).toBeLessThan(1e-6); // 정지 유지
+  });
+
+  it('R + S 단독(정지에서)은 후진으로 출발한다 (speed 음수)', () => {
+    let v = reverseEngaged();
+    expect(v.speed).toBe(0);
+    for (let i = 0; i < 20; i++) {
+      v = stepVehicle(v, { throttle: 0, brake: 1, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(v.speed).toBeLessThan(0);
+  });
+
+  it('회귀 — 전진 기어(1단)는 W=악셀로 전진(불변)', () => {
+    let v = firstGearEngaged();
+    expect(v.gearName).toBe('1');
+    for (let i = 0; i < 40; i++) {
+      v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0.6, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(v.on).toBe(true);
+    expect(v.speed).toBeGreaterThan(0); // 전진
+  });
+
+  it('회귀 — 중립(N)은 어떤 입력이든 구동 없음', () => {
+    let v = createVehicle();
+    v = stepVehicle(v, { ...NEUTRAL, ignition: true }, 0.05, flat); // 시동(N 유지)
+    expect(v.gearName).toBe('N');
+    for (let i = 0; i < 30; i++) {
+      v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
+    }
+    expect(Math.abs(v.speed)).toBeLessThan(1e-6); // 구동 없음 → 정지
+  });
+});

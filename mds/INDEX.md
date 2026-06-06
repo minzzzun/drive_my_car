@@ -11,6 +11,7 @@
 - [drivetrain.md](design/drivetrain.md) — engine.js + gearbox.js 설계(RPM·클러치·stall·기어비).
 - [dynamics.md](design/dynamics.md) — dynamics.js + vehicle.js 설계(운동학·전복·통합 상태기계).
 - [input.md](design/input.md) — input.js 키 매핑 + 1인칭 운전석 카메라 결선 설계.
+- [reverse-controls.md](design/reverse-controls.md) — 후진(R) 기어에서 W/S(throttle/brake) 반전 설계.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
 - [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
@@ -26,6 +27,7 @@
 - [m7-scoring.md](done/m7-scoring.md) — M7 scoring.js(12건) + 감점/게임오버 통합, 결과 오버레이.
 - [m8-minimap-hud.md](done/m8-minimap-hud.md) — M8 minimap.js(5건)+hud.js(3건), index.html 정리.
 - [m9-acceptance.md](done/m9-acceptance.md) — M9 마감: README + ACCEPTANCE_CRITERIA 대조 검증(전 항목 충족).
+- [m10-reverse-controls.md](done/m10-reverse-controls.md) — M10 후진(R) 기어 W/S 반전, 단위 테스트 6건(전체 128 그린).
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -41,3 +43,4 @@
 | M7 | scoring.js 감점/게임오버 + 테스트 | ✅ 완료 | [done/m7-scoring.md](done/m7-scoring.md) |
 | M8 | minimap.js + hud.js | ✅ 완료 | [done/m8-minimap-hud.md](done/m8-minimap-hud.md) |
 | M9 | 마감 + 검증 | ✅ 완료 | [done/m9-acceptance.md](done/m9-acceptance.md) |
+| M10 | 후진(R) 기어 W/S 입력 반전 | ✅ 완료 | [done/m10-reverse-controls.md](done/m10-reverse-controls.md) |
