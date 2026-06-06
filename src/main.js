@@ -9,6 +9,7 @@ import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
 import { createVehicle, stepVehicle, CLUTCH_SHIFT_MAX } from './vehicle/vehicle.js';
 import { MAX_RPM } from './vehicle/engine.js';
 import { createAudio } from './render/audio.js';
+import { createBeacon } from './render/beacon.js';
 import { getMap } from './maps/index.js';
 import { getCarType, DEFAULT_CAR_ID } from './vehicle/carTypes.js';
 
@@ -35,6 +36,7 @@ let map        = null;   // 현재 맵 (인터페이스 객체)
 let vehicle    = null;
 let mission    = null;   // 배송 미션 상태
 let minimap    = null;
+let beacon     = null;   // 목적지 3D 비콘
 
 // ══════════════════════════════════════════════════════════════
 // 입력 + 시작 오버레이 (포인터 락은 커서 숨김 용도)
@@ -88,6 +90,9 @@ function pauseGame() {
   paused = true;
   overlay.style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock?.();
+  // #10 일시정지 — 엔진음 정지(시간 멈춤) + 관성 제거(재개 시 정지 상태로)
+  audio.suspend();
+  if (vehicle) { vehicle.dyn.speed = 0; vehicle.speed = 0; }
 }
 
 document.addEventListener('keydown', function(e) {
@@ -214,6 +219,12 @@ function updateHUD() {
   }
   minimap.draw(vehicle.dyn, marker);
 
+  // 목적지 3D 비콘 — 현재 목표 위치(지면 높이)·단계 색 갱신
+  if (beacon) {
+    if (t) beacon.update({ x: t.x, y: map.heightAt(t.x, t.z), z: t.z }, mission.phase);
+    else beacon.update(null, 'done');
+  }
+
   gearstick.draw(vehicle.gear, clutchIn);
 
   // ── 전체 배송 완료 안내(1회) — 탈락 없음, 자유주행은 계속 ──
@@ -267,6 +278,11 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   // 미니맵(통일 데이터 소비) 생성/부착
   minimap = createMinimap(map.getMinimapData());
   document.body.appendChild(minimap.canvas);
+
+  // 목적지 3D 비콘 — 재시작 대비 기존 제거 후 1회 생성/추가
+  if (beacon) { scene.remove(beacon.group); beacon.dispose(); }
+  beacon = createBeacon();
+  scene.add(beacon.group);
 
   // 초기 세계 스트리밍 + 카메라 위치
   map.updateWorld(spawn.x, spawn.z, scene);

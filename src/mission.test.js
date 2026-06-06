@@ -297,6 +297,18 @@ describe('jobsFromPoints — pairs 옵션(비겹침 쌍)', () => {
   });
 });
 
+// ── 인접 배송점 최소 거리 헬퍼 (#4 거리 확대 검증용) ──────────────
+//   체이닝(jobsFromPoints 기본)에서 인접 점이 곧 한 배송 구간이므로,
+//   "인접 점 간 직선거리"의 최소값이 임계 이상이면 간격이 충분히 벌어진 것.
+function minAdjacentDistance(pts) {
+  let m = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const d = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+    if (d < m) m = d;
+  }
+  return m;
+}
+
 // ── 맵 getDeliveryPoints() — 도로 위 / 결정론 (delivery.md §2.1) ──
 describe('getDeliveryPoints — 자연 맵', () => {
   it('도로 위(isOnRoad=true) 점들의 배열을 반환(≥4)', () => {
@@ -320,6 +332,15 @@ describe('getDeliveryPoints — 자연 맵', () => {
     // 새 맵 인스턴스도 동일 좌표(난수 없음)
     expect(getMap('natural').getDeliveryPoints())
       .toEqual(getMap('natural').getDeliveryPoints());
+  });
+
+  // ── #4 거리 확대 (설계 mds/design/m15-improvements.md §항목#4 — 자연 맵) ──
+  //   설계: placeCheckpoints(road, 6→4) 로 점 수를 줄여 간격을 ≈1.5배 확대.
+  //   현 구현(N=6) 인접 최소거리 ≈ 113m → N=4 적용 시 ≈ 172m.
+  //   임계 150m 는 현재(113)에선 RED, 설계 적용(172) 후 GREEN.
+  it('#4 인접 배송점 간 최소 거리가 확대 임계(≥150m) 이상', () => {
+    const pts = getMap('natural').getDeliveryPoints();
+    expect(minAdjacentDistance(pts)).toBeGreaterThanOrEqual(150);
   });
 });
 
@@ -350,5 +371,14 @@ describe('getDeliveryPoints — 도시 맵', () => {
     expect(m.getDeliveryPoints()).toEqual(m.getDeliveryPoints());
     expect(getMap('city').getDeliveryPoints())
       .toEqual(getMap('city').getDeliveryPoints());
+  });
+
+  // ── #4 거리 확대 (설계 mds/design/m15-improvements.md §항목#4 — 도시 맵) ──
+  //   설계: deliveryGrid stride ±1~±2 → ±2~±4 (CELL=72). 첫 점 (0, 3*CELL=216).
+  //   현 구현 인접 최소거리 = 144m(2칸 미만 구간 존재) → 설계 적용 시 ≈ 203m.
+  //   임계 180m 는 현재(144)에선 RED, 설계 적용(≈203) 후 GREEN.
+  it('#4 인접 배송점 간 최소 거리가 확대 임계(≥180m) 이상', () => {
+    const pts = getMap('city').getDeliveryPoints();
+    expect(minAdjacentDistance(pts)).toBeGreaterThanOrEqual(180);
   });
 });

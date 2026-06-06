@@ -1,6 +1,7 @@
 // vehicle.js 통합 상태기계 단위 테스트 (M4)
 import { describe, it, expect } from 'vitest';
 import { createVehicle, stepVehicle } from './vehicle.js';
+import { getCarType } from './carTypes.js';
 
 const flat = () => 0;
 const NEUTRAL = { throttle: 0, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false };
@@ -170,5 +171,44 @@ describe('후진 W/S 반전 (M10)', () => {
       v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat);
     }
     expect(Math.abs(v.speed)).toBeLessThan(1e-6); // 구동 없음 → 정지
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// #7 기어 최고속 (설계 mds/design/m15-improvements.md §항목#7)
+//   목표: 고단(5단)이 저단(3단)보다 더 높은 속도로 정착한다(톱기어가 더 빠름).
+//   저단부터 차례로 업시프트하며 풀스로틀로 충분히 정착시킨 뒤 비교.
+//   (한 번에 고단으로 결합하면 RPM이 STALL 밑으로 떨어져 시동이 꺼지므로
+//    실제 운전처럼 1단→목표기어 순차 가속.)
+//   설계의 torque 바닥 혼합/5단 비 변경 후에도 "고단이 더 빠르다" 방향은
+//   유지되어야 하는 불변식 가드(GREEN 예상).
+// ──────────────────────────────────────────────────────────────
+describe('#7 기어 최고속 — 고단일수록 더 빠르게 정착', () => {
+  const flat2 = () => 0;
+
+  // 같은 차종(sedan)으로 1단부터 targetGear 까지 순차 가속 후 정착 속도 반환.
+  function settledSpeed(targetGear) {
+    const sedan = getCarType('sedan');
+    let v = createVehicle({ x: 0, z: 0 }, sedan.perf);
+    v = stepVehicle(v, { ...NEUTRAL, ignition: true }, 0.05, flat2); // 시동
+    for (let g = 1; g <= targetGear; g++) {
+      // 클러치 밟고 한 단 업시프트
+      v = stepVehicle(v, { ...NEUTRAL, clutchPedal: 1, shift: 1 }, 0.05, flat2);
+      // 그 기어에서 풀스로틀 가속(목표 기어는 충분히 정착시킨다)
+      const steps = g === targetGear ? 4000 : 200;
+      for (let i = 0; i < steps; i++) {
+        v = stepVehicle(v, { throttle: 1, brake: 0, clutchPedal: 0, steer: 0, shift: 0, ignition: false }, 0.05, flat2);
+      }
+    }
+    return { speed: v.speed, gear: v.gear, on: v.on };
+  }
+
+  it('5단 정착 속도 > 3단 정착 속도(같은 차종), 엔진 유지', () => {
+    const s3 = settledSpeed(3);
+    const s5 = settledSpeed(5);
+    expect(s3.on).toBe(true);
+    expect(s5.on).toBe(true);
+    expect(s5.gear).toBe(5);
+    expect(s5.speed).toBeGreaterThan(s3.speed);
   });
 });

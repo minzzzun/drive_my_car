@@ -102,15 +102,16 @@ export function createCityMap() {
 
   // 배송 지점 — 격자 교차점 고정 목록 (스폰(0,0) 제외, 전부 도로 위, 결정론)
   //   (i*CELL, j*CELL) 형태 → 항상 교차로(도로) 위.
+  //   #4 거리 확대 — stride 를 ±2~±4 로 키워 인접 점 간 거리 ≥180m 보장.
   const deliveryGrid = [
-    { i: 0, j: 2, label: '북부 창고' },
-    { i: 2, j: 2, label: '동북 물류센터' },
-    { i: 2, j: 0, label: '동부 시장' },
-    { i: 2, j: -2, label: '동남 항만' },
-    { i: 0, j: -2, label: '남부 터미널' },
-    { i: -2, j: -1, label: '서남 공단' },
-    { i: -2, j: 1, label: '서부 역' },
-    { i: -1, j: 3, label: '중앙 교차로' },
+    { i: 0, j: 3, label: '북부 창고' },     // 216m
+    { i: 3, j: 3, label: '동북 물류센터' },
+    { i: 3, j: 0, label: '동부 시장' },
+    { i: 3, j: -3, label: '동남 항만' },
+    { i: 0, j: -3, label: '남부 터미널' },
+    { i: -3, j: -2, label: '서남 공단' },
+    { i: -3, j: 2, label: '서부 역' },
+    { i: -1, j: 4, label: '중앙 교차로' },
   ];
   const deliveryPoints = deliveryGrid.map((g) => ({
     x: g.i * CELL,
@@ -169,7 +170,7 @@ export function createCityMap() {
     buildStatic(scene) {
       // 도시 분위기: 옅은 회색 하늘 + 약한 포그 + 도시톤 조명
       scene.background = new THREE.Color(0xb8bcc2);
-      scene.fog = new THREE.FogExp2(0xb8bcc2, 0.006);
+      // 안개 제거(#3) — 원경 비콘 가시성 확보(배경색은 유지)
       scene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.1);
       sunLight.position.set(200, 400, 150);

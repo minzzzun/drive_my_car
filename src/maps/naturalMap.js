@@ -84,7 +84,8 @@ export function createNaturalMap() {
     // ── 배송 지점 (순수, 결정론) ─────────────────────────
     //   도로 중심선 등간격 점(placeCheckpoints 재사용) → 전부 도로 위 보장.
     getDeliveryPoints() {
-      const pts = placeCheckpoints(road, 6);
+      // #4 거리 확대 — N 6→4 로 점 수를 줄여 점 간 간격을 ≈1.5배로.
+      const pts = placeCheckpoints(road, 4);
       return pts.map((p, i) => ({
         x: p.x,
         z: p.z,
@@ -112,7 +113,7 @@ export function createNaturalMap() {
     buildStatic(scene) {
       // 배경/포그/조명 (main.js 65~77행 분위기 그대로)
       scene.background = new THREE.Color(0x87ceeb);
-      scene.fog = new THREE.FogExp2(0x87ceeb, 0.010);
+      // 안개 제거(#3) — 원경 비콘 가시성 확보(배경색은 유지)
       scene.add(new THREE.AmbientLight(0xffffff, 0.55));
       const sunLight = new THREE.DirectionalLight(0xfffde7, 1.3);
       sunLight.position.set(300, 500, 200);

@@ -166,6 +166,12 @@ export function createAudio(opts = {}) {
     src.start();
   }
 
+  // 일시정지: ctx가 있으면 suspend (그래프/소스 유지, 시간만 정지).
+  //   엔진음·변속음·잔향이 한 번에 멈춘다. resume()이 ctx.resume()으로 복원.
+  function suspend() {
+    if (ctx && ctx.suspend && ctx.state === 'running') ctx.suspend();
+  }
+
   function setMuted(value) {
     muted = !!value;
     applyMute();
@@ -177,6 +183,7 @@ export function createAudio(opts = {}) {
 
   return {
     resume,
+    suspend,
     update,
     onShift,
     setMuted,

@@ -75,7 +75,10 @@ export function stepVehicle(v, controls, dt, sampleHeight) {
   if (eng.on && inGear && engagement > 0) {
     const dir = gear < 0 ? -1 : 1;
     const maxSpeed = Math.abs(speedFromEngineRpm(MAX_RPM, gear)) * car.gearTopFactor; // 이 기어 최고속(차종 배율)
-    const torque   = car.accelBase * (totalRatio(gear) / totalRatio(3)); // 저단일수록 큼
+    // #7 고단 토크 바닥 혼합 — 고단이 0.57배까지 떨어지지 않게(5단≈0.81배) 가속 회복.
+    //   저단은 여전히 큼(1단≈1.64배). 단조 경향·차종차등(accelBase) 유지.
+    const ratioK   = totalRatio(gear) / totalRatio(3);
+    const torque   = car.accelBase * (0.55 + 0.45 * ratioK);
     const headroom = Math.max(0, 1 - Math.abs(v.dyn.speed) / maxSpeed); // 최고속 근처서 0
     engineAccel = dir * effThrottle * torque * engagement * headroom;
   }

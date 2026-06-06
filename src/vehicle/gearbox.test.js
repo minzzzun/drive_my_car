@@ -5,6 +5,7 @@ import {
   gearName, shiftUp, shiftDown, totalRatio,
   engineRpmFromSpeed, speedFromEngineRpm,
 } from './gearbox.js';
+import { MAX_RPM } from './engine.js';
 
 describe('gearName', () => {
   it('기어 표기', () => {
@@ -69,5 +70,23 @@ describe('상수', () => {
   it('GEARS 순서/바퀴 반경', () => {
     expect(GEARS).toEqual([-1, 0, 1, 2, 3, 4, 5]);
     expect(WHEEL_RADIUS).toBeGreaterThan(0);
+  });
+});
+
+// ── #7 기어 최고속 단조성 (설계 mds/design/m15-improvements.md §항목#7) ──
+//   speedFromEngineRpm(MAX_RPM, gear) = 그 기어의 이론 최고속(레드라인).
+//   설계 요구: 고단일수록 최고속이 커야 한다(1<2<3<4<5). 특히 5단 > 4단.
+//   설계가 GEAR_RATIOS['5'] 0.8→0.95 로 낮춰도(238 > 226 km/h) 단조성은 유지되므로
+//   이 테스트는 변경 전후 모두 GREEN(불변식 가드). RPM↔속도 정합 공식은 그대로.
+describe('#7 기어별 이론 최고속 단조성', () => {
+  it('speedFromEngineRpm(MAX_RPM, g)가 1<2<3<4<5 순으로 증가', () => {
+    const tops = [1, 2, 3, 4, 5].map((g) => speedFromEngineRpm(MAX_RPM, g));
+    for (let i = 0; i < tops.length - 1; i++) {
+      expect(tops[i + 1]).toBeGreaterThan(tops[i]);
+    }
+  });
+
+  it('5단 최고속 > 4단 최고속', () => {
+    expect(speedFromEngineRpm(MAX_RPM, 5)).toBeGreaterThan(speedFromEngineRpm(MAX_RPM, 4));
   });
 });
