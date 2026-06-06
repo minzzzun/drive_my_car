@@ -59,6 +59,20 @@ describe('getMap', () => {
   });
 });
 
+describe('isBlocked 인터페이스 (M12b 보강 — 모든 맵 필수 메서드)', () => {
+  it("getMap('natural') 객체가 isBlocked 메서드를 가진다", () => {
+    const m = getMap('natural');
+    expect(typeof m.isBlocked).toBe('function');
+  });
+
+  it("등록되어 있다면 getMap('city') 객체도 isBlocked 메서드를 가진다", () => {
+    const ids = listMaps().map((e) => e.id);
+    if (!ids.includes('city')) return; // city 미등록(M12a 단계)이면 skip
+    const m = getMap('city');
+    expect(typeof m.isBlocked).toBe('function');
+  });
+});
+
 describe('listMaps', () => {
   it('배열을 반환하고 최소 한 개 이상의 맵을 포함한다', () => {
     const list = listMaps();

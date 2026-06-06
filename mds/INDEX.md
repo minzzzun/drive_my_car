@@ -32,6 +32,7 @@
 - [m10-reverse-controls.md](done/m10-reverse-controls.md) — M10 후진(R) 기어 W/S 반전, 단위 테스트 6건(전체 128 그린).
 - [m11-audio.md](done/m11-audio.md) — M11 사운드(엔진 샘플 루프+변속음), audio 테스트 23건(전체 151 그린).
 - [m12a-map-abstraction.md](done/m12a-map-abstraction.md) — M12a 맵 추상화+naturalMap 래퍼(회귀 0), maps 테스트 16건(전체 167 그린).
+- [m12bc-city-map.md](done/m12bc-city-map.md) — M12b/c 도시 맵(격자·다색 건물·충돌)+맵 선택 UI, city 테스트(전체 202 그린).
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -50,3 +51,4 @@
 | M10 | 후진(R) 기어 W/S 입력 반전 | ✅ 완료 | [done/m10-reverse-controls.md](done/m10-reverse-controls.md) |
 | M11 | 사운드(엔진음+변속음+음소거) | ✅ 완료 | [done/m11-audio.md](done/m11-audio.md) |
 | M12a | 맵 추상화 + naturalMap 래퍼 | ✅ 완료 | [done/m12a-map-abstraction.md](done/m12a-map-abstraction.md) |
+| M12b/c | 도시 맵(격자·건물·충돌) + 맵 선택 UI | ✅ 완료 | [done/m12bc-city-map.md](done/m12bc-city-map.md) |

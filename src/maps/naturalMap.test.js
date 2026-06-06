@@ -101,6 +101,20 @@ describe('naturalMap.isOnRoad 동치성', () => {
   });
 });
 
+describe('naturalMap.isBlocked (회귀 0 — 자연 맵엔 고체 없음)', () => {
+  it('여러 좌표에서 항상 false (통행 가능)', () => {
+    const m = getNaturalMap();
+    expect(typeof m.isBlocked).toBe('function');
+    for (const [x, z] of SAMPLE_COORDS) {
+      expect(m.isBlocked(x, z)).toBe(false);
+    }
+    // 체크포인트(도로 중심) 위도 막히지 않아야 함
+    for (const cp of refCheckpoints) {
+      expect(m.isBlocked(cp.x, cp.z)).toBe(false);
+    }
+  });
+});
+
 describe('naturalMap.getSpawn 동치성', () => {
   it('기존 main.js 스폰 계산(위치+heading+y)과 일치', () => {
     const m = getNaturalMap();

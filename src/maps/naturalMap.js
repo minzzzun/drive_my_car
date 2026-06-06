@@ -75,6 +75,9 @@ export function createNaturalMap() {
     isOnRoad(x, z) { return isOnRoad(road, x, z); },
     distanceToRoad(x, z) { return distanceToCenterline(road, x, z); },
 
+    // ── 통과 불가(고체) 판정 (순수) — 자연 맵엔 고체 없음(회귀 0) ──
+    isBlocked() { return false; },
+
     // ── 목표 지점 (순수) ─────────────────────────────────
     getGoals() { return checkpoints; },
 
