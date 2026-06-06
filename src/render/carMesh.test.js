@@ -1,7 +1,7 @@
 // render/carMesh.js 단위 테스트 (M6, M13b) — THREE 객체는 WebGL 없이 생성 가능
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { buildCar, updateCarTransform } from './carMesh.js';
+import { buildCar, updateCarTransform, setCargo } from './carMesh.js';
 import { CAR_TYPES } from '../vehicle/carTypes.js';
 
 // ── M13b 테스트 헬퍼 ───────────────────────────────────────────
@@ -98,6 +98,105 @@ describe('buildCar', () => {
     const sedanY = sedan.wheels[0].position.y;
     const truckY = truck.wheels[0].position.y;
     expect(truckY).toBeGreaterThan(sedanY);
+  });
+});
+
+// ── M16a: 화물 시각화 ───────────────────────────────────────────
+// 기대 시그니처(설계 m16-cargo-bigmap.md §"화물 시각화" 기준 가정):
+//   - buildCar(carType) 가 name='cargo' 인 child(BoxGeometry MeshPhong)를
+//     추가하고, 기본 visible=false(픽업 전이라 안 보임)로 둔다.
+//   - setCargo(car, visible) — carMesh.js 의 named export.
+//       car.getObjectByName('cargo').visible = !!visible 로 토글.
+//   - 화물 크기/위치(설계 산출식, 차종 mesh 치수 기준):
+//       cargoW = bodyWidth * 0.7
+//       cargoD = bodyLen   * 0.38   (BoxGeometry depth)
+//       cargoH = max(0.5, bodyHeight * 1.1)
+//       cargoZ = -sign(cabinOffsetZ) * bodyLen * 0.18  (sign(0)=+1)
+//                → 캐빈 반대편 섀시 위에 얹힘.
+function cargoOf(car) {
+  return car.getObjectByName('cargo');
+}
+
+describe('buildCar 화물(cargo) child', () => {
+  it("name='cargo' child 를 가지며 기본 visible=false (픽업 전)", () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    const cargo = cargoOf(car);
+    expect(cargo).toBeDefined();
+    expect(cargo.geometry).toBeInstanceOf(THREE.BoxGeometry);
+    expect(cargo.visible).toBe(false);
+  });
+
+  it('cargo child 가 늘어도 children.length >= 6 유지 — 회귀 0', () => {
+    const car = buildCar();
+    // 섀시1 + 캐빈1 + 바퀴4 + 화물1 = 7 (>=6)
+    expect(car.children.length).toBeGreaterThanOrEqual(6);
+    expect(cargoOf(car)).toBeDefined();
+  });
+
+  it('트럭 화물 박스가 승용차보다 크다 (width/depth/height 모두)', () => {
+    const sedanCargo = cargoOf(buildCar(CAR_TYPES.sedan.mesh));
+    const truckCargo = cargoOf(buildCar(CAR_TYPES.truck.mesh));
+    expect(truckCargo.geometry.parameters.width).toBeGreaterThan(
+      sedanCargo.geometry.parameters.width,
+    );
+    expect(truckCargo.geometry.parameters.depth).toBeGreaterThan(
+      sedanCargo.geometry.parameters.depth,
+    );
+    expect(truckCargo.geometry.parameters.height).toBeGreaterThan(
+      sedanCargo.geometry.parameters.height,
+    );
+  });
+
+  it('화물 크기가 차종 mesh 비례(설계 산출식)를 따른다', () => {
+    const m = CAR_TYPES.truck.mesh;
+    const cargo = cargoOf(buildCar(m));
+    expect(cargo.geometry.parameters.width).toBeCloseTo(m.bodyWidth * 0.7, 6);
+    expect(cargo.geometry.parameters.depth).toBeCloseTo(m.bodyLen * 0.38, 6);
+    expect(cargo.geometry.parameters.height).toBeCloseTo(
+      Math.max(0.5, m.bodyHeight * 1.1),
+      6,
+    );
+  });
+
+  it('화물 z 위치가 캐빈 반대편(cabinOffsetZ 부호 반대)에 있다', () => {
+    // sedan: cabinOffsetZ<0 → cargoZ>0
+    const sedanCargo = cargoOf(buildCar(CAR_TYPES.sedan.mesh));
+    expect(CAR_TYPES.sedan.mesh.cabinOffsetZ).toBeLessThan(0);
+    expect(sedanCargo.position.z).toBeGreaterThan(0);
+    // truck: cabinOffsetZ>0 → cargoZ<0
+    const truckCargo = cargoOf(buildCar(CAR_TYPES.truck.mesh));
+    expect(CAR_TYPES.truck.mesh.cabinOffsetZ).toBeGreaterThan(0);
+    expect(truckCargo.position.z).toBeLessThan(0);
+  });
+
+  it('화물 y 중심이 섀시 윗면 위(= bodyHeight-0.05 + cargoH/2)', () => {
+    const m = CAR_TYPES.truck.mesh;
+    const cargo = cargoOf(buildCar(m));
+    const cargoH = Math.max(0.5, m.bodyHeight * 1.1);
+    expect(cargo.position.y).toBeCloseTo(m.bodyHeight - 0.05 + cargoH / 2, 6);
+  });
+});
+
+describe('setCargo', () => {
+  it('setCargo(car, true) → cargo.visible=true, false → false (idempotent)', () => {
+    const car = buildCar(CAR_TYPES.truck.mesh);
+    expect(cargoOf(car).visible).toBe(false);
+    setCargo(car, true);
+    expect(cargoOf(car).visible).toBe(true);
+    setCargo(car, true); // 반복 호출도 안전
+    expect(cargoOf(car).visible).toBe(true);
+    setCargo(car, false);
+    expect(cargoOf(car).visible).toBe(false);
+    setCargo(car, false);
+    expect(cargoOf(car).visible).toBe(false);
+  });
+
+  it('truthy/falsy 인자를 boolean 으로 정규화', () => {
+    const car = buildCar();
+    setCargo(car, 1);
+    expect(cargoOf(car).visible).toBe(true);
+    setCargo(car, 0);
+    expect(cargoOf(car).visible).toBe(false);
   });
 });
 

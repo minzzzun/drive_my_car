@@ -14,6 +14,9 @@ export const DEFAULT_MESH = {
   bodyColor: 0xcc2222, cabinColor: 0x2255cc, wheelColor: 0x222222,
 };
 
+// 화물 박스 색(택배 톤). M17 미션 다양화 때 opts.color 로 확장 여지.
+export const CARGO_COLOR = 0x9c6b3f;
+
 // carType 은 mesh 객체(예: CAR_TYPES.truck.mesh) 또는 mesh 를 품은 차종 객체.
 export function buildCar(carType = {}) {
   const m = { ...DEFAULT_MESH, ...(carType.mesh ?? carType) };
@@ -56,7 +59,28 @@ export function buildCar(carType = {}) {
     car.add(wheel);
   }
 
+  // 화물 박스 — 적재함(캐빈 반대편 섀시 위)에 얹는다. 기본 숨김(픽업 시 표시).
+  const sgn = (m.cabinOffsetZ || 0) >= 0 ? 1 : -1;  // 캐빈 쪽 부호(sign(0)=+1)
+  const cargoW = m.bodyWidth * 0.7;
+  const cargoD = m.bodyLen  * 0.38;
+  const cargoH = Math.max(0.5, m.bodyHeight * 1.1);
+  const cargo = new THREE.Mesh(
+    new THREE.BoxGeometry(cargoW, cargoH, cargoD),
+    new THREE.MeshPhongMaterial({ color: CARGO_COLOR }),
+  );
+  cargo.name = 'cargo';
+  // y = 섀시 윗면(bodyHeight-0.05) + 화물 절반, z = 캐빈 반대편
+  cargo.position.set(0, (m.bodyHeight - 0.05) + cargoH / 2, -sgn * m.bodyLen * 0.18);
+  cargo.visible = false;  // 회귀 0: 기본 외형 그대로, 픽업 시 켜짐
+  car.add(cargo);
+
   return car;
+}
+
+// 화물 표시/숨김 토글 — mission.hasCargo 와 동기화.
+export function setCargo(car, visible) {
+  const cargo = car.getObjectByName('cargo');
+  if (cargo) cargo.visible = !!visible;
 }
 
 // 차량 정렬 — '천장' 축(up=지형 법선) 기준으로 heading 회전 ─────────

@@ -9,6 +9,9 @@
 // 목표 도달 판정 반경(m). strict `<` 비교(경계 = 미도착).
 export const ARRIVE_RADIUS = 6;
 
+// 적재/하차 가능 최대 속도(m/s). 이보다 빠르면 "정차 안 함"으로 보고 적재/하차 보류.
+export const STOP_SPEED = 0.5;
+
 // 미션 생성 — jobs 비면 즉시 done. ────────────────────────────────
 //   job: { pickup: {x,z,label}, dropoff: {x,z,label} }
 export function createMission(jobs) {
@@ -33,9 +36,10 @@ export function currentTarget(state) {
   return { x: t.x, z: t.z, phase: state.phase, label: t.label };
 }
 
-// 한 스텝 전진 — carPos={x,z}. 도착이면 phase 전이(불변 갱신). ─────
+// 한 스텝 전진 — carPos={x,z}, opts.speed=차량 속도(m/s, 기본 0=정차). ─
+//   적재/하차는 목표 반경 안 + **정차(|speed|<=STOP_SPEED)** 일 때만 일어난다.
 //   반환: { state, event }   event ∈ null | 'pickedUp' | 'delivered' | 'allDone'
-export function stepMission(state, carPos) {
+export function stepMission(state, carPos, opts = {}) {
   // done 이면 no-op (새 객체 반환, 입력 미변형)
   if (state.phase === 'done') {
     return { state: { ...state }, event: null };
@@ -47,6 +51,12 @@ export function stepMission(state, carPos) {
   // 도착 판정 — strict `<` (경계 = 미도착)
   const dist = Math.hypot(carPos.x - t.x, carPos.z - t.z);
   if (dist >= ARRIVE_RADIUS) {
+    return { state: { ...state }, event: null };
+  }
+
+  // 정차해야만 적재/하차 가능 — 너무 빠르면 보류(반경 안이어도 전이 없음)
+  const speed = opts.speed ?? 0;
+  if (Math.abs(speed) > STOP_SPEED) {
     return { state: { ...state }, event: null };
   }
 

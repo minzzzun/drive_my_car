@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from './terrain.js';
-import { createMission, currentTarget, stepMission, jobsFromPoints } from './mission.js';
-import { buildCar, updateCarTransform } from './render/carMesh.js';
+import { createMission, currentTarget, stepMission, jobsFromPoints, ARRIVE_RADIUS, STOP_SPEED } from './mission.js';
+import { buildCar, updateCarTransform, setCargo } from './render/carMesh.js';
 import { createMinimap } from './render/minimap.js';
+import { createBigmap } from './render/bigmap.js';
 import { createHud } from './render/hud.js';
 import { createGearstick } from './render/gearstick.js';
 import { createInput, onKeyDown, onKeyUp, readControls } from './input.js';
@@ -36,6 +37,8 @@ let map        = null;   // 현재 맵 (인터페이스 객체)
 let vehicle    = null;
 let mission    = null;   // 배송 미션 상태
 let minimap    = null;
+let bigmap     = null;   // 큰 지도 오버레이(#9)
+let bigMapOpen = false;  // 큰 지도 열림 여부 — 열린 동안 주행 정지
 let beacon     = null;   // 목적지 3D 비콘
 
 // ══════════════════════════════════════════════════════════════
@@ -95,8 +98,21 @@ function pauseGame() {
   if (vehicle) { vehicle.dyn.speed = 0; vehicle.speed = 0; }
 }
 
+// #9 큰 지도 토글 — 열린 동안 주행 일시정지 + 엔진음 정지. pause 중엔 무시.
+function toggleBigMap() {
+  if (paused || !started || !mission || !bigmap) return;
+  bigMapOpen = bigmap.toggle();           // true=열림
+  if (bigMapOpen) {
+    bigmap.draw(vehicle.dyn, mission);    // 열자마자 1회 갱신
+    audio.suspend();
+  } else {
+    audio.resume();
+  }
+}
+
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Escape') { pauseGame(); return; }
+  if (e.code === 'KeyG') { toggleBigMap(); return; }
   if (e.code === 'KeyM') { audio.toggleMute(); return; }
   if (e.code === 'Digit4' || e.code === 'Numpad4') {
     cameraMode = cameraMode === 'first' ? 'third' : 'first';
@@ -149,12 +165,14 @@ function updateVehicle(dt) {
   }
 
   // ── 배송 미션 전진 — 도착 시 토스트 안내(채점/감점 없음) ──────────
-  const { state: nextMission, event } = stepMission(mission, { x: d.x, z: d.z });
+  const { state: nextMission, event } = stepMission(mission, { x: d.x, z: d.z }, { speed: vehicle.speed });
   mission = nextMission;
   if (event === 'pickedUp') {
+    setCargo(car, true);                 // 적재함에 박스 표시
     const t = currentTarget(mission);   // 적재 후 현재 목표 = 배송지
     hud.showToast(`📦 짐을 실었습니다 — ${t ? t.label : ''}(으)로!`);
   } else if (event === 'delivered') {
+    setCargo(car, false);                // 하차 → 박스 숨김
     hud.showToast(`✅ 배송 완료! (${mission.completed}/${mission.total})`);
   }
   // event === 'allDone' 은 결과 오버레이(updateHUD)가 처리
@@ -199,6 +217,8 @@ function updateHUD() {
   // ── 현재 목표 + 거리 → 배송 HUD ──
   const t = currentTarget(mission);
   const dist = t ? Math.hypot(vehicle.dyn.x - t.x, vehicle.dyn.z - t.z) : 0;
+  // 목표 반경 안인데 아직 달리는 중이면 "정차하세요" 안내
+  const needStop = !!t && dist < ARRIVE_RADIUS && Math.abs(vehicle.speed) > STOP_SPEED;
   hud.update(vehicle, {
     phase: mission.phase,
     label: t ? t.label : '',
@@ -206,6 +226,7 @@ function updateHUD() {
     hasCargo: mission.hasCargo,
     completed: mission.completed,
     total: mission.total,
+    needStop,
   });
 
   // ── 미니맵 마커: 현재 단계 목표를 pickup/dropoff 슬롯에 배치 ──
@@ -261,6 +282,7 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   // 차량 메시를 차종에 맞춰 (재)생성 — 재시작 대비 기존 메시 제거
   if (car) scene.remove(car);
   car = buildCar(carType.mesh);
+  setCargo(car, false);  // 새 미션은 hasCargo=false — 화물 박스 숨김 초기화
   scene.add(car);
 
   // 정적 씬(코스 메시·조명·배경·포그) 구성
@@ -278,6 +300,12 @@ function startGame(mapId = 'natural', carId = DEFAULT_CAR_ID) {
   // 미니맵(통일 데이터 소비) 생성/부착
   minimap = createMinimap(map.getMinimapData());
   document.body.appendChild(minimap.canvas);
+
+  // 큰 지도 오버레이(#9) — 재시작 대비 기존 제거 후 생성/부착
+  if (bigmap) bigmap.canvas.remove();
+  bigmap = createBigmap(map.getMinimapData(), map.getDeliveryPoints());
+  bigMapOpen = false;
+  document.body.appendChild(bigmap.canvas);
 
   // 목적지 3D 비콘 — 재시작 대비 기존 제거 후 1회 생성/추가
   if (beacon) { scene.remove(beacon.group); beacon.dispose(); }
@@ -300,7 +328,10 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (started && !paused && mission) updateVehicle(dt);
+  if (started && !paused && !bigMapOpen && mission) updateVehicle(dt);
+
+  // 큰 지도 열린 동안 매 프레임 갱신(차량 마커는 정지 위치 유지)
+  if (bigMapOpen && bigmap) bigmap.draw(vehicle.dyn, mission);
 
   if (map) {
     const pcx = Math.floor(camera.position.x / CHUNK_SIZE);

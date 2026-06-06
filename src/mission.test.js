@@ -37,6 +37,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ARRIVE_RADIUS,
+  STOP_SPEED,
   createMission,
   currentTarget,
   stepMission,
@@ -55,6 +56,46 @@ function mkJob(px, pz, dx, dz, plabel = 'P', dlabel = 'D') {
 // 좌표에서 거리 R 만큼 떨어진 점(같은 x, z만 +R) → 도착/미도착 케이스 제어.
 function at(p) { return { x: p.x, z: p.z }; }
 function offset(p, d) { return { x: p.x + d, z: p.z }; }
+
+describe('정차해야 적재/하차 (STOP_SPEED)', () => {
+  const job = mkJob(0, 100, 0, 200);
+
+  it('반경 안이어도 빠르게 지나가면(속도>STOP_SPEED) 적재 안 됨', () => {
+    const m = createMission([job]);
+    const { state, event } = stepMission(m, at(job.pickup), { speed: 10 });
+    expect(event).toBe(null);
+    expect(state.phase).toBe('toPickup');
+    expect(state.hasCargo).toBe(false);
+  });
+
+  it('반경 안 + 정차(speed≈0)면 적재됨', () => {
+    const m = createMission([job]);
+    const { state, event } = stepMission(m, at(job.pickup), { speed: 0 });
+    expect(event).toBe('pickedUp');
+    expect(state.hasCargo).toBe(true);
+  });
+
+  it('STOP_SPEED 경계 이하면 적재 허용', () => {
+    const m = createMission([job]);
+    const { event } = stepMission(m, at(job.pickup), { speed: STOP_SPEED });
+    expect(event).toBe('pickedUp');
+  });
+
+  it('하차도 정차해야 함 — 적재 후 빠르게 배송지 통과 시 하차 안 됨', () => {
+    let m = createMission([job]);
+    m = stepMission(m, at(job.pickup), { speed: 0 }).state; // 적재
+    const { state, event } = stepMission(m, at(job.dropoff), { speed: 8 });
+    expect(event).toBe(null);
+    expect(state.phase).toBe('toDropoff');
+    expect(state.hasCargo).toBe(true);
+  });
+
+  it('opts 미지정 시 정차로 간주(기본 동작 유지)', () => {
+    const m = createMission([job]);
+    const { event } = stepMission(m, at(job.pickup));
+    expect(event).toBe('pickedUp');
+  });
+});
 
 describe('ARRIVE_RADIUS 상수', () => {
   it('설계값 6', () => {

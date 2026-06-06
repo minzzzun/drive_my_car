@@ -17,6 +17,7 @@
 - [cartypes.md](design/cartypes.md) — 차종 선택(승용차/트럭) 성능·외형 파라미터 주입 설계.
 - [delivery.md](design/delivery.md) — 유로트럭식 배송 모드(미션 상태기계·순수 운송) 설계.
 - [m15-improvements.md](design/m15-improvements.md) — 빠른개선(ESC정지·안개제거+비콘·거리확대·기어속도) 설계.
+- [m16-cargo-bigmap.md](design/m16-cargo-bigmap.md) — 화물 시각화 + 큰 지도 보기 설계.
 - [carmesh.md](design/carmesh.md) — render/carMesh.js 차량 메시 + 변환 설계.
 - [scoring.md](design/scoring.md) — scoring.js 감점/게임오버/승리·체크포인트 타이머 설계.
 - [minimap-hud.md](design/minimap-hud.md) — minimap.js(상공뷰) + hud.js(RPM 게이지) 설계.
@@ -39,6 +40,7 @@
 - [m13-cartypes.md](done/m13-cartypes.md) — M13 차종 선택(승용차/트럭) 성능·외형·UI, carTypes/carMesh 테스트(전체 231 그린).
 - [m14-delivery.md](done/m14-delivery.md) — M14 배송 모드(미션 상태기계·HUD·미니맵, scoring 제거), mission 테스트(전체 272 그린).
 - [m15-improvements.md](done/m15-improvements.md) — M15 빠른개선(ESC정지·안개제거+비콘·거리확대·기어속도), 전체 277 그린.
+- [m16-cargo-bigmap.md](done/m16-cargo-bigmap.md) — M16 화물 시각화+큰지도+정차 적재/하차, 전체 290 그린.
 
 ## 진행 현황 (마일스톤)
 | # | 마일스톤 | 상태 | 문서 |
@@ -61,3 +63,4 @@
 | M13 | 차종 선택(승용차/트럭) | ✅ 완료 | [done/m13-cartypes.md](done/m13-cartypes.md) |
 | M14 | 유로트럭식 배송 모드(순수 운송) | ✅ 완료 | [done/m14-delivery.md](done/m14-delivery.md) |
 | M15 | 빠른개선(ESC정지·안개·비콘·거리·기어) | ✅ 완료 | [done/m15-improvements.md](done/m15-improvements.md) |
+| M16 | 화물 시각화 + 큰지도 + 정차 적재 | ✅ 완료 | [done/m16-cargo-bigmap.md](done/m16-cargo-bigmap.md) |

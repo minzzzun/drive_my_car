@@ -61,10 +61,14 @@ export function createHud(opts = {}) {
         `✅ 모든 배송 완료 &#160;|&#160; ${done}`;
     } else {
       const icon = mv.phase === 'toDropoff' ? '🏁 배송지로' : '📦 적재지로';
+      // 목표 반경 안인데 아직 달리는 중이면 "정차하세요" 안내
+      const stopHint = mv.needStop
+        ? ' &#160;|&#160; <b style="color:#ffcc33">🛑 정차하세요</b>'
+        : '';
       line2.innerHTML =
         `${icon} <b>${mv.label ?? ''}</b> &#160;|&#160; ` +
         `${Math.round(mv.distance ?? 0)} m &#160;|&#160; ` +
-        `${cargo} &#160;|&#160; ${done}`;
+        `${cargo} &#160;|&#160; ${done}${stopHint}`;
     }
   }
 
